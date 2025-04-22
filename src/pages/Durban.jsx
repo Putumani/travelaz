@@ -6,7 +6,7 @@ function Durban() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('https://your-render-app.onrender.com/api/accommodations/durban')
+    fetch('/api/accommodations/durban')
       .then((res) => res.json())
       .then((data) => {
         setAccommodations(data);
@@ -25,7 +25,7 @@ function Durban() {
       <h2 className="text-3xl font-bold mb-8 text-black">Top 10 Accommodations in Durban</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {accommodations.map((accommodation) => (
-          <AccommodationCard key={accommodation._id} accommodation={accommodation} />
+          <AccommodationCard key={accommodation.id} accommodation={accommodation} />
         ))}
       </div>
     </div>

@@ -8,13 +8,14 @@ function AccommodationCard({ accommodation }) {
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-gray-200">
       <LazyLoadImage
-        src={accommodation.imageUrl}
+        src={`${accommodation.image_url}?monochrome=000000`}
         alt={accommodation.name}
         effect="blur"
         className="w-full h-48 object-cover"
       />
       <div className="p-4">
         <h3 className="text-lg font-semibold text-black">{accommodation.name}</h3>
+        <p className="text-gray-600 mt-1">{accommodation.area}</p>
         <p className="text-gray-600 mt-1">From ${accommodation.price}/night</p>
         <p className="text-gray-500 mt-1">Rating: {accommodation.rating}/5</p>
         <p className="text-gray-600 mt-2 text-sm">{accommodation.description}</p>
