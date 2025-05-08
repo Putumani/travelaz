@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
-import AccommodationCard from '../components/AccommodationCard';
+import AccommodationCard from '@/components/AccommodationCard';
 
 function Durban() {
-  const [accommodations, setAccommodations] = useState([]);
+  const [accommodations, setAccommodations] = useState(Array(10).fill({ empty: true })); // Initialize with 10 placeholders
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/accommodations/durban')
       .then((res) => res.json())
       .then((data) => {
-        setAccommodations(data);
+        // Fill with placeholders if fewer than 10 items
+        const filledData = [...data];
+        while (filledData.length < 10) {
+          filledData.push({ id: `placeholder-${filledData.length}`, empty: true });
+        }
+        setAccommodations(filledData.slice(0, 10));
         setLoading(false);
       })
       .catch((err) => {
@@ -24,8 +29,11 @@ function Durban() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 bg-white">
       <h2 className="text-3xl font-bold mb-8 text-black">Top 10 Accommodations in Durban</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        {accommodations.map((accommodation) => (
-          <AccommodationCard key={accommodation.id} accommodation={accommodation} />
+        {accommodations.map((accommodation, index) => (
+          <AccommodationCard 
+            key={accommodation.id || `placeholder-${index}`} 
+            accommodation={accommodation} 
+          />
         ))}
       </div>
     </div>
