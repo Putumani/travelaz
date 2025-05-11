@@ -1,1 +1,0 @@
-export const affiliateId = 'MY_TRAVELSTART_AFFILIATE_ID'; 
