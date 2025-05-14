@@ -1,3 +1,4 @@
+// import { getCloudinaryImageUrl } from '@/utils/cloudinary';
 import { LazyLoadImage } from 'react-lazy-load-image-component'
 import 'react-lazy-load-image-component/src/effects/blur.css'
 
@@ -21,13 +22,9 @@ function AccommodationCard({ accommodation }) {
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border-2 border-gray-300 min-h-[400px] flex flex-col">
       <div className="relative h-48 bg-gray-100 flex items-center justify-center">
         <LazyLoadImage
-          src={accommodation.image_url}
-          alt={accommodation.name}
-          effect="blur"
-          className="w-full h-full object-cover"
+          src={accommodation.image_url || `https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_600,h_400,c_fill/default-placeholder`}
           onError={(e) => {
-            e.target.onerror = null
-            e.target.src = 'https://via.placeholder.com/600x400?text=No+Image'
+            e.target.src = `https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_600,h_400,c_fill/default-placeholder`;
           }}
         />
       </div>

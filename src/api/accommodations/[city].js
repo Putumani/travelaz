@@ -22,7 +22,6 @@ export default async function handler(req, res) {
 
     if (error) throw error
 
-    // Transform image URLs to use Cloudinary
     const transformedData = data.map(item => ({
       ...item,
       image_url: item.image_url 
