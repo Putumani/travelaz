@@ -7,7 +7,7 @@ function CapeTown() {
   const [accommodations, setAccommodations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { fetchData } = useAccommodations('Cape Town'); // Changed from 'capetown' to 'Cape Town'
+  const { fetchData } = useAccommodations('Cape Town');
 
   useEffect(() => {
     let isMounted = true;
