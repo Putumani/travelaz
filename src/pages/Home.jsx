@@ -1,72 +1,48 @@
 import Hero from '@/components/Hero';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
-import { incrementHotelView } from '../utils/hotelViews'; 
+import { incrementHotelView } from '../utils/hotelViews';
 
 function Home() {
   const [popularHotels, setPopularHotels] = useState([]);
   const [errorMessage, setErrorMessage] = useState(null);
+  const location = useLocation();
 
   useEffect(() => {
     const fetchPopularHotels = async () => {
       console.log('Fetching popular hotels...');
-      const { data: viewsData, error: viewsError } = await supabase
-        .from('hotel_views')
-        .select('hotel_id, view_count')
+      const { data, error } = await supabase
+        .from('accommodations')
+        .select('id, name, city, price, rating, image_url, area, view_count')
         .order('view_count', { ascending: false })
         .limit(5);
 
-      if (viewsError) {
-        console.error('Error fetching hotel views:', viewsError.message);
+      if (error) {
+        console.error('Error fetching popular hotels:', error.message);
         setErrorMessage('Failed to load popular hotels. Please try again later.');
         return;
       }
 
-      console.log('Hotel views data:', viewsData);
-
-      if (!viewsData || viewsData.length === 0) {
-        console.log('No hotel views found.');
-        setPopularHotels([]);
-        return;
-      }
-
-      const hotelIds = viewsData.map(item => item.hotel_id);
-      const { data: accommodationsData, error: accommodationsError } = await supabase
-        .from('accommodations')
-        .select('id, name, city, price, rating, image_url, area')
-        .in('id', hotelIds);
-
-      if (accommodationsError) {
-        console.error('Error fetching accommodations:', accommodationsError.message);
-        setErrorMessage('Failed to load hotel details. Please try again later.');
-        return;
-      }
-
-      console.log('Accommodations data:', accommodationsData);
-
-      const mergedHotels = accommodationsData.map(hotel => {
-        const viewEntry = viewsData.find(view => view.hotel_id === hotel.id);
-        return {
-          ...hotel,
-          view_count: viewEntry ? viewEntry.view_count : 0
-        };
-      });
-
-      console.log('Merged hotels:', mergedHotels);
-      setPopularHotels(mergedHotels);
+      console.log('Popular hotels data:', data);
+      setPopularHotels(data);
     };
 
     fetchPopularHotels();
-  }, []);
+  }, [location]);
 
-  const handleCardClick = async (hotelId, city) => {
-    await incrementHotelView(hotelId, city);
-    console.log(`Incremented view for hotel ID ${hotelId} in ${city}`);
-  };
+  const handleCardClick = async (id) => {
+  try {
+    console.log(`Incrementing views for hotel ID: ${id}`);
+    await incrementHotelView(id);
+    console.log(`Successfully incremented views for hotel ID: ${id}`);
+  } catch (error) {
+    console.error(`Failed to increment views: ${error.message}`);
+  }
+};
 
   return (
     <Layout>
@@ -78,10 +54,10 @@ function Home() {
             <div className="text-center text-red-500">{errorMessage}</div>
           ) : popularHotels.length > 0 ? (
             popularHotels.map((hotel) => (
-              <div key={hotel.id} className="block" onClick={() => handleCardClick(hotel.id, hotel.city)}>
+              <div key={hotel.id} className="block" onClick={() => handleCardClick(hotel.id)}>
                 <Link to={`/${hotel.city.toLowerCase().replace(' ', '')}`} className="block">
-                  <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg border-2 border-gray-300">
-                    <div className="relative h-32 sm:h-36 lg:h-40 w-full bg-gray-100">
+                  <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border-2 border-gray-300 min-h-[300px] sm:min-h-[350px] lg:min-h-[400px] flex flex-col">
+                    <div className="relative h-40 sm:h-44 lg:h-48 w-full bg-gray-100">
                       <LazyLoadImage
                         src={hotel.image_url || `https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_600,h_400,c_fill/default-placeholder`}
                         alt={hotel.name}
@@ -94,10 +70,11 @@ function Home() {
                         effect="blur"
                       />
                     </div>
-                    <div className="p-3 sm:p-4">
+                    <div className="p-3 sm:p-4 flex-grow">
                       <h3 className="text-base sm:text-lg font-semibold text-black truncate">{hotel.name}</h3>
+                      <p className="text-gray-600 mt-1 text-sm sm:text-base">{hotel.area}</p>
                       <p className="text-gray-600 mt-1 text-sm sm:text-base">From ${hotel.price}/night</p>
-                      <p className="text-gray-500 text-sm">Views: {hotel.view_count}</p>
+                      <p className="text-gray-500 mt-1 text-sm sm:text-base">Rating: {hotel.rating}/5</p>
                       <a
                         href="#"
                         target="_blank"

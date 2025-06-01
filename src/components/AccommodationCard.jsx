@@ -1,13 +1,17 @@
-// import { useEffect } from 'react';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import { incrementHotelView } from '../utils/hotelViews';
 
 function AccommodationCard({ accommodation }) {
   const handleCardClick = async () => {
-    if (accommodation?.id) {
-      await incrementHotelView(accommodation.id, accommodation.city);
-      console.log(`Incremented view for ${accommodation.name} (ID: ${accommodation.id})`);
+    if (!accommodation?.id) return;
+    
+    try {
+      console.log(`Incrementing views for ${accommodation.name} (ID: ${accommodation.id})`);
+      await incrementHotelView(accommodation.id);
+      console.log(`Successfully incremented views for ${accommodation.name}`);
+    } catch (error) {
+      console.error(`Failed to increment views: ${error.message}`);
     }
   };
 

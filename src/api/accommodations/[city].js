@@ -30,9 +30,7 @@ export default async function handler(req, res) {
       
       return {
         ...item,
-        image_url: `https://res.cloudinary.com/${
-          import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-        }/image/upload/w_600,h_400,c_fill,f_auto,q_auto/${cloudinaryPath}`
+        image_url: `https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_600,h_400,c_fill,f_auto,q_auto/${cloudinaryPath}`
       };
     });
 

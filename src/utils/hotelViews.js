@@ -1,32 +1,36 @@
-import { supabase } from '../lib/supabaseClient'; 
+import { supabase } from '../lib/supabaseClient';
 
-export async function incrementHotelView(hotelId, city) {
-  const { data, error } = await supabase
-    .from('hotel_views')
-    .select('view_count')
-    .eq('hotel_id', hotelId)
-    .eq('city', city)
-    .single();
-
-  if (error && error.code === 'PGRST116') {
-    const { error: insertError } = await supabase.from('hotel_views').insert({
-      hotel_id: hotelId,
-      city: city,
-      view_count: 1,
-    });
-    if (insertError) {
-      console.error('Error inserting hotel view:', insertError);
+export async function incrementHotelView(id) {
+  try {
+    const parsedId = parseInt(id, 10);
+    if (isNaN(parsedId)) {
+      throw new Error(`Invalid id: ${id}. Must be a valid integer.`);
     }
-  } else if (error) {
-    console.error('Error fetching hotel view:', error);
-  } else {
+
+    console.log(`Attempting to increment view for id: ${parsedId}`);
+
+    const { data: currentData, error: fetchError } = await supabase
+      .from('accommodations')
+      .select('view_count')
+      .eq('id', parsedId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const currentCount = currentData?.view_count || 0;
+    const newCount = currentCount + 1;
+
     const { error: updateError } = await supabase
-      .from('hotel_views')
-      .update({ view_count: data.view_count + 1 })
-      .eq('hotel_id', hotelId)
-      .eq('city', city);
-    if (updateError) {
-      console.error('Error updating hotel view:', updateError);
-    }
+      .from('accommodations')
+      .update({ view_count: newCount })
+      .eq('id', parsedId);
+
+    if (updateError) throw updateError;
+
+    console.log(`Successfully incremented view_count to ${newCount} for id: ${parsedId}`);
+    return newCount;
+  } catch (error) {
+    console.error('Error in incrementHotelView:', error.message);
+    throw error;
   }
 }
