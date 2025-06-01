@@ -1,5 +1,3 @@
-// import { getCloudinaryImageUrl } from '@/utils/cloudinary';
-
 function Hero() {
   const backgroundUrl = `https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_1800,h_500,c_fill/pexels-taryn-elliott-4098987_x3jl2e`;
 
