@@ -23,10 +23,8 @@ export default async function handler(req, res) {
     if (error) throw error;
 
     const transformedData = data.map(item => {
-      // Skip transformation if no image_url exists
       if (!item.image_url) return item;
       
-      // Extract the important part after /upload/
       const uploadIndex = item.image_url.indexOf('/upload/') + 8;
       const cloudinaryPath = item.image_url.slice(uploadIndex);
       

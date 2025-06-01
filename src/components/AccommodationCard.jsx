@@ -1,7 +1,16 @@
+// import { useEffect } from 'react';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
+import { incrementHotelView } from '../utils/hotelViews';
 
 function AccommodationCard({ accommodation }) {
+  const handleCardClick = async () => {
+    if (accommodation?.id) {
+      await incrementHotelView(accommodation.id, accommodation.city);
+      console.log(`Incremented view for ${accommodation.name} (ID: ${accommodation.id})`);
+    }
+  };
+
   if (!accommodation) {
     return (
       <div className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-gray-300 min-h-[300px] sm:min-h-[350px] lg:min-h-[400px] animate-pulse">
@@ -18,7 +27,10 @@ function AccommodationCard({ accommodation }) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border-2 border-gray-300 min-h-[300px] sm:min-h-[350px] lg:min-h-[400px] flex flex-col">
+    <div
+      className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border-2 border-gray-300 min-h-[300px] sm:min-h-[350px] lg:min-h-[400px] flex flex-col cursor-pointer"
+      onClick={handleCardClick}
+    >
       <div className="relative h-40 sm:h-44 lg:h-48 w-full bg-gray-100">
         <LazyLoadImage
           src={accommodation.image_url || `https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_600,h_400,c_fill/default-placeholder`}
