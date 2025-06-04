@@ -34,7 +34,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         <div className="max-h-[400px] overflow-y-auto">
           {accommodation?.affiliate_deals?.length > 0 ? (
             accommodation.affiliate_deals
-              .sort((a, b) => a.price - b.price) // Sort by price
+              .sort((a, b) => a.price - b.price) 
               .map((deal, index) => (
                 <div key={index} className="flex items-center justify-between py-3 border-b last:border-b-0">
                   <div className="flex items-center space-x-3">
@@ -57,7 +57,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                       rel="noopener noreferrer"
                       className="px-3 py-1 bg-black text-white text-sm rounded hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
                     >
-                      Book
+                      View Deals
                     </a>
                   </div>
                 </div>

@@ -20,7 +20,7 @@ function AccommodationCard({ accommodation }) {
   };
 
   const handleBookClick = (e) => {
-    e.stopPropagation(); // Prevent card click event
+    e.stopPropagation(); 
     setIsPopupOpen(true);
   };
 
@@ -66,7 +66,6 @@ function AccommodationCard({ accommodation }) {
         <p className="text-gray-600 mt-1 text-sm sm:text-base">{accommodation.area}</p>
         <p className="text-gray-600 mt-1 text-sm sm:text-base">From ${accommodation.price}/night</p>
         <p className="text-gray-500 mt-1 text-sm sm:text-base">Rating: {accommodation.rating}/5</p>
-        <p className="text-gray-600 mt-2 text-xs sm:text-sm line-clamp-2">{accommodation.description || 'No description available.'}</p>
         <button
           onClick={handleBookClick}
           className="mt-2 sm:mt-4 inline-block px-3 py-1 sm:px-4 sm:py-2 bg-black text-white text-sm sm:text-base rounded hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
