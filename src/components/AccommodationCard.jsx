@@ -77,28 +77,28 @@ function AccommodationCard({ accommodation }) {
       {isPopupOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClosePopup}>
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md sm:max-w-lg md:max-w-xl p-6 mx-4" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
+            <div className="bg-gray-800 text-white rounded-t-lg -m-6 mb-4 p-4 flex justify-between items-center">
               <div className="flex space-x-6">
                 <div className="flex items-center">
-                  <svg className="w-7 h-7 mr-2 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7 mr-2 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14V4zM6 7H5v12c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V7H6zm6 10h-2v-6h2v6zm4-6h-2v6h2v-6z"/>
                   </svg>
                   <span>Check-in: 12 May 2025</span>
                 </div>
                 <div className="flex items-center">
-                  <svg className="w-7 h-7 mr-2 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7 mr-2 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14V4zM6 7H5v12c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V7H6zm6 10h-2v-6h2v6zm4-6h-2v6h2v-6z"/>
                   </svg>
                   <span>Check-out: 15 May 2025</span>
                 </div>
                 <div className="flex items-center">
-                  <svg className="w-6 h-6 mr-2 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-6 h-6 mr-2 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                   </svg>
                   <span>2 Rooms, 4 Guests</span>
                 </div>
               </div>
-              <button onClick={handleClosePopup} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+              <button onClick={handleClosePopup} className="text-white hover:text-gray-300 focus:outline-none">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -107,7 +107,7 @@ function AccommodationCard({ accommodation }) {
             <div className="max-h-[400px] overflow-y-auto">
               {accommodation.affiliate_deals?.length > 0 ? (
                 accommodation.affiliate_deals
-                  .sort((a, b) => a.price - b.price) 
+                  .sort((a, b) => a.price - b.price) // Ensure sorting by price
                   .map((deal, index) => (
                     <div key={index} className="flex items-center justify-between py-3 border-b last:border-b-0">
                       <div className="flex items-center space-x-3">
