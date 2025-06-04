@@ -5,7 +5,7 @@ export function useAccommodations(city) {
   const fetchData = useCallback(async () => {
     const { data, error } = await supabase
       .from('accommodations')
-      .select('*')
+      .select('*, affiliate_deals')
       .ilike('city', `%${city}%`);
     
     if (error) throw error;
