@@ -1,83 +1,83 @@
+import { useState } from 'react';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
-import { incrementHotelView } from '../utils/hotelViews';
-import { useState } from 'react';
 import ComparisonCard from './ComparisonCard';
 
 function AccommodationCard({ accommodation }) {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
 
-  const handleCardClick = async () => {
-    if (!accommodation?.id) return;
-    
-    try {
-      console.log(`Incrementing views for ${accommodation.name} (ID: ${accommodation.id})`);
-      await incrementHotelView(accommodation.id);
-      console.log(`Successfully incremented views for ${accommodation.name}`);
-    } catch (error) {
-      console.error(`Failed to increment views: ${error.message}`);
-    }
-  };
-
-  const handleBookClick = (e) => {
-    e.stopPropagation(); 
+  const handleCardClick = () => {
     setIsPopupOpen(true);
   };
 
-  const handleClosePopup = () => {
-    setIsPopupOpen(false);
+  const handleBookClick = (e) => {
+    e.stopPropagation();
+    setIsPopupOpen(true);
   };
 
   if (!accommodation) {
     return (
-      <div className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-gray-300 min-h-[300px] sm:min-h-[350px] lg:min-h-[400px] animate-pulse">
-        <div className="h-40 sm:h-44 lg:h-48 bg-gray-200"></div>
-        <div className="p-3 sm:p-4 space-y-2">
-          <div className="h-5 sm:h-6 bg-gray-200 rounded w-3/4"></div>
+      <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 min-h-[300px] animate-pulse">
+        <div className="h-40 bg-gray-200"></div>
+        <div className="p-4 space-y-2">
+          <div className="h-5 bg-gray-200 rounded w-3/4"></div>
           <div className="h-4 bg-gray-200 rounded w-1/2"></div>
           <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-          <div className="h-8 sm:h-10 bg-gray-200 rounded mt-2 sm:mt-4"></div>
+          <div className="h-8 bg-gray-200 rounded mt-3"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border-2 border-gray-300 min-h-[300px] sm:min-h-[350px] lg:min-h-[400px] flex flex-col cursor-pointer"
-      onClick={handleCardClick}
-    >
-      <div className="relative h-40 sm:h-44 lg:h-48 w-full bg-gray-100">
+    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-gray-200 flex flex-col h-full">
+      <div 
+        className="relative h-40 w-full bg-gray-100 cursor-pointer"
+        onClick={handleCardClick}
+      >
         <LazyLoadImage
-          src={accommodation.image_url || `https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_600,h_400,c_fill/default-placeholder`}
+          src={accommodation.image_url || `https://via.placeholder.com/600x400?text=${encodeURIComponent(accommodation.name)}`}
           alt={accommodation.name}
           className="w-full h-full object-cover"
-          onError={(e) => {
-            e.target.src = `https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_600,h_400,c_fill/default-placeholder`;
-          }}
+          effect="blur"
           width="100%"
           height="100%"
-          effect="blur"
+          onError={(e) => {
+            e.target.src = `https://via.placeholder.com/600x400?text=${encodeURIComponent(accommodation.name)}`;
+          }}
         />
       </div>
-      <div className="p-3 sm:p-4 flex-grow">
-        <h3 className="text-base sm:text-lg font-semibold text-black truncate">{accommodation.name}</h3>
-        <p className="text-gray-600 mt-1 text-sm sm:text-base">{accommodation.area}</p>
-        <p className="text-gray-600 mt-1 text-sm sm:text-base">From ${accommodation.price}/night</p>
-        <p className="text-gray-500 mt-1 text-sm sm:text-base">Rating: {accommodation.rating}/5</p>
-        <button
-          onClick={handleBookClick}
-          className="mt-2 sm:mt-4 inline-block px-3 py-1 sm:px-4 sm:py-2 bg-black text-white text-sm sm:text-base rounded hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
+
+      <div className="p-4 flex-grow flex flex-col">
+        <h3 
+          className="text-lg font-semibold text-gray-900 mb-1 cursor-pointer line-clamp-1"
+          onClick={handleCardClick}
         >
-          Book Now
-        </button>
+          {accommodation.name}
+        </h3>
+        <p className="text-gray-600 text-sm mb-2 line-clamp-1">{accommodation.area}</p>
+        
+        <div className="flex items-center justify-between mt-auto">
+          <div>
+            <p className="text-gray-900 font-medium">${accommodation.price}<span className="text-gray-500 text-sm">/night</span></p>
+            <div className="flex items-center">
+              <span className="text-yellow-500">★</span>
+              <span className="text-gray-700 ml-1 text-sm">{accommodation.rating}</span>
+            </div>
+          </div>
+          <button
+            onClick={handleBookClick}
+            className="px-4 py-2 bg-black hover:bg-gray-800 text-white text-sm font-medium rounded transition-colors"
+          >
+            Book Now
+          </button>
+        </div>
       </div>
 
       <ComparisonCard
         accommodation={accommodation}
         isOpen={isPopupOpen}
-        onClose={handleClosePopup}
+        onClose={() => setIsPopupOpen(false)}
       />
     </div>
   );

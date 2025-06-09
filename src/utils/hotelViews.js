@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 
+// src/utils/hotelViews.js
 export async function incrementHotelView(id) {
   try {
     const parsedId = parseInt(id, 10);
@@ -9,28 +10,43 @@ export async function incrementHotelView(id) {
 
     console.log(`Attempting to increment view for id: ${parsedId}`);
 
+    // First fetch the current count
     const { data: currentData, error: fetchError } = await supabase
       .from('accommodations')
       .select('view_count')
       .eq('id', parsedId)
       .single();
 
-    if (fetchError) throw fetchError;
+    if (fetchError) {
+      console.error('Fetch error:', fetchError);
+      throw fetchError;
+    }
 
-    const currentCount = currentData?.view_count || 0;
+    if (!currentData) {
+      throw new Error(`No accommodation found with id: ${parsedId}`);
+    }
+
+    const currentCount = currentData.view_count || 0;
     const newCount = currentCount + 1;
 
-    const { error: updateError } = await supabase
+    console.log(`Updating view_count from ${currentCount} to ${newCount}`);
+
+    // Then update with the new count
+    const { data: updateData, error: updateError } = await supabase
       .from('accommodations')
       .update({ view_count: newCount })
-      .eq('id', parsedId);
+      .eq('id', parsedId)
+      .select(); // Add this to return the updated record
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error('Update error:', updateError);
+      throw updateError;
+    }
 
-    console.log(`Successfully incremented view_count to ${newCount} for id: ${parsedId}`);
+    console.log('Update successful:', updateData);
     return newCount;
   } catch (error) {
-    console.error('Error in incrementHotelView:', error.message);
+    console.error('Error in incrementHotelView:', error);
     throw error;
   }
 }
