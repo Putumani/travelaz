@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import ComparisonCard from './ComparisonCard';
+import { CurrencyContext } from '../context/CurrencyContext';
 
 function AccommodationCard({ accommodation }) {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const { convertAmount, getCurrencySymbol } = useContext(CurrencyContext);
 
   const handleCardClick = () => {
     setIsPopupOpen(true);
@@ -59,7 +61,10 @@ function AccommodationCard({ accommodation }) {
         
         <div className="flex items-center justify-between mt-auto">
           <div>
-            <p className="text-gray-900 font-medium">${accommodation.price}<span className="text-gray-500 text-sm">/night</span></p>
+            <p className="text-gray-900 font-medium">
+              {getCurrencySymbol()}{convertAmount(accommodation.price)}
+              <span className="text-gray-500 text-sm">/night</span>
+            </p>
             <div className="flex items-center">
               <span className="text-yellow-500">★</span>
               <span className="text-gray-700 ml-1 text-sm">{accommodation.rating}</span>

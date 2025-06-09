@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
 
-// src/utils/hotelViews.js
 export async function incrementHotelView(id) {
   try {
     const parsedId = parseInt(id, 10);
@@ -10,7 +9,6 @@ export async function incrementHotelView(id) {
 
     console.log(`Attempting to increment view for id: ${parsedId}`);
 
-    // First fetch the current count
     const { data: currentData, error: fetchError } = await supabase
       .from('accommodations')
       .select('view_count')
@@ -31,12 +29,11 @@ export async function incrementHotelView(id) {
 
     console.log(`Updating view_count from ${currentCount} to ${newCount}`);
 
-    // Then update with the new count
     const { data: updateData, error: updateError } = await supabase
       .from('accommodations')
       .update({ view_count: newCount })
       .eq('id', parsedId)
-      .select(); // Add this to return the updated record
+      .select();
 
     if (updateError) {
       console.error('Update error:', updateError);

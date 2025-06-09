@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { incrementHotelView } from '../utils/hotelViews';
-import LoadingSpinner from './LoadingSpinner'; 
+import LoadingSpinner from './LoadingSpinner';
+import { CurrencyContext } from '../context/CurrencyContext';
 
 function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [isUpdatingViews, setIsUpdatingViews] = useState(false);
   const [lastClickedDeal, setLastClickedDeal] = useState(null);
+  const { convertAmount, getCurrencySymbol } = useContext(CurrencyContext);
 
   if (!isOpen) return null;
 
@@ -16,7 +18,6 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     
     try {
       await incrementHotelView(accommodation.id);
-      console.log(`View counted for ${accommodation.name} via ${deal.site_name}`);
       
       if (window.gtag) {
         window.gtag('event', 'view_deal', {
@@ -83,7 +84,9 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                     <span className={`text-xs ${deal.price > 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {deal.price > 0 ? "Available" : "Sold Out"}
                     </span>
-                    <span className="font-bold text-lg whitespace-nowrap">${deal.price}</span>
+                    <span className="font-bold text-lg whitespace-nowrap">
+                      {getCurrencySymbol()}{convertAmount(deal.price)}
+                    </span>
                     <button
                       onClick={(e) => handleViewDealClick(e, deal)}
                       disabled={isUpdatingViews && lastClickedDeal === deal.site_name}

@@ -1,25 +1,56 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useContext } from 'react';
+import { CurrencyContext } from '../context/CurrencyContext';
+import { LanguageContext } from '../context/LanguageContext';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
-  const [currentLanguage, setCurrentLanguage] = useState('English');
-  const [currentCurrency, setCurrentCurrency] = useState('USD');
+  const { currentCurrency, setCurrentCurrency } = useContext(CurrencyContext);
+  const { currentLanguage, setCurrentLanguage } = useContext(LanguageContext);
 
   const languages = [
-    { code: 'en', name: 'English' },
-    { code: 'af', name: 'Afrikaans' },
-    { code: 'th', name: 'Thai' }
+    { code: 'en-US', name: 'English (US)' },
+    { code: 'en-GB', name: 'English (UK)' },
+    { code: 'fr', name: 'Français' },
+    { code: 'es', name: 'Español' },
+    { code: 'de', name: 'Deutsch' },
+    { code: 'it', name: 'Italiano' }
   ];
 
   const currencies = [
-    { code: 'ZAR', name: 'South African Rand', symbol: 'R' },
-    { code: 'USD', name: 'US Dollar', symbol: '$' },
-    { code: 'GBP', name: 'British Pound', symbol: '£' },
-    { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' }
+    { code: 'USD', name: 'US Dollar' },
+    { code: 'ZAR', name: 'South African Rand' },
+    { code: 'GBP', name: 'British Pound' },
+    { code: 'EUR', name: 'Euro' },
+    { code: 'AUD', name: 'Australian Dollar' },
+    { code: 'THB', name: 'Thai Baht' } // Added Thai Baht
   ];
+
+  const handleLanguageChange = (language) => {
+    setCurrentLanguage(language.code);
+    setIsLanguageOpen(false);
+    localStorage.setItem('preferredLanguage', language.code);
+  };
+
+  const handleCurrencyChange = (currency) => {
+    setCurrentCurrency(currency.code);
+    setIsCurrencyOpen(false);
+    localStorage.setItem('preferredCurrency', currency.code);
+  };
+
+  const getTranslatedText = (key) => {
+    const translations = {
+      'en-US': { 'Home': 'Home', 'Durban': 'Durban', 'Cape Town': 'Cape Town', 'Bangkok': 'Bangkok' },
+      'en-GB': { 'Home': 'Home', 'Durban': 'Durban', 'Cape Town': 'Cape Town', 'Bangkok': 'Bangkok' },
+      'fr': { 'Home': 'Accueil', 'Durban': 'Durban', 'Cape Town': 'Le Cap', 'Bangkok': 'Bangkok' },
+      'es': { 'Home': 'Inicio', 'Durban': 'Durban', 'Cape Town': 'Ciudad del Cabo', 'Bangkok': 'Bangkok' },
+      'de': { 'Home': 'Startseite', 'Durban': 'Durban', 'Cape Town': 'Kapstadt', 'Bangkok': 'Bangkok' },
+      'it': { 'Home': 'Home', 'Durban': 'Durban', 'Cape Town': 'Città del Capo', 'Bangkok': 'Bangkok' }
+    };
+    return translations[currentLanguage]?.[key] || key;
+  };
 
   return (
     <header className="bg-black text-white shadow-lg">
@@ -28,10 +59,26 @@ function Header() {
         
         <nav className={`sm:flex ${isMenuOpen ? 'block' : 'hidden'} sm:block mx-auto`}>
           <ul className="flex flex-col sm:flex-row sm:space-x-6 p-4 sm:p-0">
-            <li className="mb-2 sm:mb-0"><Link to="/" className="text-base sm:text-lg hover:text-gray-300" onClick={() => setIsMenuOpen(false)}>Home</Link></li>
-            <li className="mb-2 sm:mb-0"><Link to="/durban" className="text-base sm:text-lg hover:text-gray-300" onClick={() => setIsMenuOpen(false)}>Durban</Link></li>
-            <li className="mb-2 sm:mb-0"><Link to="/capetown" className="text-base sm:text-lg hover:text-gray-300" onClick={() => setIsMenuOpen(false)}>Cape Town</Link></li>
-            <li className="mb-2 sm:mb-0"><Link to="/bangkok" className="text-base sm:text-lg hover:text-gray-300" onClick={() => setIsMenuOpen(false)}>Bangkok</Link></li>
+            <li className="mb-2 sm:mb-0">
+              <Link to="/" className="text-base sm:text-lg hover:text-gray-300" onClick={() => setIsMenuOpen(false)}>
+                {getTranslatedText('Home')}
+              </Link>
+            </li>
+            <li className="mb-2 sm:mb-0">
+              <Link to="/durban" className="text-base sm:text-lg hover:text-gray-300" onClick={() => setIsMenuOpen(false)}>
+                {getTranslatedText('Durban')}
+              </Link>
+            </li>
+            <li className="mb-2 sm:mb-0">
+              <Link to="/capetown" className="text-base sm:text-lg hover:text-gray-300" onClick={() => setIsMenuOpen(false)}>
+                {getTranslatedText('Cape Town')}
+              </Link>
+            </li>
+            <li className="mb-2 sm:mb-0">
+              <Link to="/bangkok" className="text-base sm:text-lg hover:text-gray-300" onClick={() => setIsMenuOpen(false)}>
+                {getTranslatedText('Bangkok')}
+              </Link>
+            </li>
           </ul>
         </nav>
 
@@ -60,17 +107,14 @@ function Header() {
             </button>
 
             {isCurrencyOpen && (
-              <div className="absolute right-0 mt-2 w-32 bg-black border border-gray-700 rounded-md shadow-lg z-50">
+              <div className="absolute right-0 mt-2 w-40 bg-black border border-gray-700 rounded-md shadow-lg z-50">
                 {currencies.map((currency) => (
                   <button
                     key={currency.code}
                     className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-800 ${currentCurrency === currency.code ? 'text-gray-300' : ''}`}
-                    onClick={() => {
-                      setCurrentCurrency(currency.code);
-                      setIsCurrencyOpen(false);
-                    }}
+                    onClick={() => handleCurrencyChange(currency)}
                   >
-                    {currency.code} ({currency.symbol})
+                    {currency.code} - {currency.name}
                   </button>
                 ))}
               </div>
@@ -85,22 +129,19 @@ function Header() {
                 setIsCurrencyOpen(false);
               }}
             >
-              {currentLanguage}
+              {languages.find(l => l.code === currentLanguage)?.name || 'Language'}
               <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {isLanguageOpen && (
-              <div className="absolute right-0 mt-2 w-32 bg-black border border-gray-700 rounded-md shadow-lg z-50">
+              <div className="absolute right-0 mt-2 w-40 bg-black border border-gray-700 rounded-md shadow-lg z-50">
                 {languages.map((language) => (
                   <button
                     key={language.code}
-                    className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-800 ${currentLanguage === language.name ? 'text-gray-300' : ''}`}
-                    onClick={() => {
-                      setCurrentLanguage(language.name);
-                      setIsLanguageOpen(false);
-                    }}
+                    className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-800 ${currentLanguage === language.code ? 'text-gray-300' : ''}`}
+                    onClick={() => handleLanguageChange(language)}
                   >
                     {language.name}
                   </button>
@@ -132,12 +173,9 @@ function Header() {
                 <button
                   key={currency.code}
                   className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-800 ${currentCurrency === currency.code ? 'text-gray-300' : ''}`}
-                  onClick={() => {
-                    setCurrentCurrency(currency.code);
-                    setIsCurrencyOpen(false);
-                  }}
+                  onClick={() => handleCurrencyChange(currency)}
                 >
-                  {currency.code} ({currency.symbol})
+                  {currency.code} - {currency.name}
                 </button>
               ))}
             </div>
@@ -152,7 +190,7 @@ function Header() {
               setIsCurrencyOpen(false);
             }}
           >
-            {currentLanguage}
+            {languages.find(l => l.code === currentLanguage)?.name || 'Language'}
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
             </svg>
@@ -163,11 +201,8 @@ function Header() {
               {languages.map((language) => (
                 <button
                   key={language.code}
-                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-800 ${currentLanguage === language.name ? 'text-gray-300' : ''}`}
-                  onClick={() => {
-                    setCurrentLanguage(language.name);
-                    setIsLanguageOpen(false);
-                  }}
+                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-800 ${currentLanguage === language.code ? 'text-gray-300' : ''}`}
+                  onClick={() => handleLanguageChange(language)}
                 >
                   {language.name}
                 </button>
