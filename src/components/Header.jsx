@@ -25,7 +25,7 @@ function Header() {
     { code: 'GBP', name: 'British Pound' },
     { code: 'EUR', name: 'Euro' },
     { code: 'AUD', name: 'Australian Dollar' },
-    { code: 'THB', name: 'Thai Baht' } // Added Thai Baht
+    { code: 'THB', name: 'Thai Baht' }
   ];
 
   const handleLanguageChange = (language) => {
