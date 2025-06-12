@@ -23,7 +23,6 @@ export default async function handler(req, res) {
     if (error) throw error;
 
     const transformedData = data.map(item => {
-      // Sort affiliate deals by price in ascending order
       const sortedDeals = item.affiliate_deals 
         ? [...item.affiliate_deals].sort((a, b) => a.price - b.price)
         : [];

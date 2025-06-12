@@ -3,10 +3,12 @@ import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import ComparisonCard from './ComparisonCard';
 import { CurrencyContext } from '../context/CurrencyContext';
+import { useTranslation } from '../i18n/useTranslation';
 
 function AccommodationCard({ accommodation }) {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const { convertAmount, getCurrencySymbol } = useContext(CurrencyContext);
+  const { t } = useTranslation();
 
   const handleCardClick = () => {
     setIsPopupOpen(true);
@@ -33,37 +35,45 @@ function AccommodationCard({ accommodation }) {
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-gray-200 flex flex-col h-full">
-      <div 
+      <div
         className="relative h-40 w-full bg-gray-100 cursor-pointer"
         onClick={handleCardClick}
       >
         <LazyLoadImage
-          src={accommodation.image_url || `https://via.placeholder.com/600x400?text=${encodeURIComponent(accommodation.name)}`}
+          src={
+            accommodation.image_url ||
+            `https://via.placeholder.com/600x400?text=${encodeURIComponent(
+              accommodation.name
+            )}`
+          }
           alt={accommodation.name}
           className="w-full h-full object-cover"
           effect="blur"
           width="100%"
           height="100%"
           onError={(e) => {
-            e.target.src = `https://via.placeholder.com/600x400?text=${encodeURIComponent(accommodation.name)}`;
+            e.target.src = `https://via.placeholder.com/600x400?text=${encodeURIComponent(
+              accommodation.name
+            )}`;
           }}
         />
       </div>
 
       <div className="p-4 flex-grow flex flex-col">
-        <h3 
+        <h3
           className="text-lg font-semibold text-gray-900 mb-1 cursor-pointer line-clamp-1"
           onClick={handleCardClick}
         >
           {accommodation.name}
         </h3>
-        <p className="text-gray-600 text-sm mb-2 line-clamp-1">{accommodation.area}</p>
-        
+        <p className="text-gray-600 text-sm mb-2 line-clamp-1">{accommodation.description}</p>
+
         <div className="flex items-center justify-between mt-auto">
           <div>
             <p className="text-gray-900 font-medium">
-              {getCurrencySymbol()}{convertAmount(accommodation.price)}
-              <span className="text-gray-500 text-sm">/night</span>
+              {getCurrencySymbol()}
+              {convertAmount(accommodation.price)}
+              <span className="text-gray-500 text-sm"> {t('PerNight')}</span>
             </p>
             <div className="flex items-center">
               <span className="text-yellow-500">★</span>
@@ -74,7 +84,7 @@ function AccommodationCard({ accommodation }) {
             onClick={handleBookClick}
             className="px-4 py-2 bg-black hover:bg-gray-800 text-white text-sm font-medium rounded transition-colors"
           >
-            Book Now
+            {t('BookNow')}
           </button>
         </div>
       </div>

@@ -4,11 +4,13 @@ import Layout from '@/components/Layout';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import AccommodationCard from '@/components/AccommodationCard';
+import { useTranslation } from '../i18n/useTranslation';
 
 function Home() {
   const [popularHotels, setPopularHotels] = useState([]);
   const [errorMessage, setErrorMessage] = useState(null);
   const location = useLocation();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const fetchPopularHotels = async () => {
@@ -21,7 +23,7 @@ function Home() {
 
       if (error) {
         console.error('Error fetching popular hotels:', error.message);
-        setErrorMessage('Failed to load popular hotels. Please try again later.');
+        setErrorMessage(t('FailedToLoadHotels'));
         return;
       }
 
@@ -30,13 +32,13 @@ function Home() {
     };
 
     fetchPopularHotels();
-  }, [location]);
+  }, [location, t]);
 
   return (
     <Layout>
       <Hero />
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12 bg-gray-50">
-        <h2 className="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8 text-black">Popular Hotels</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8 text-black">{t('PopularHotels')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 sm:gap-8">
           {errorMessage ? (
             <div className="text-center text-red-500">{errorMessage}</div>
@@ -45,12 +47,12 @@ function Home() {
               <AccommodationCard key={hotel.id} accommodation={hotel} />
             ))
           ) : (
-            <div className="text-center text-gray-500">No popular hotels available yet.</div>
+            <div className="text-center text-gray-500">{t('NoHotelsAvailable')}</div>
           )}
         </div>
       </section>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12 bg-white">
-        <h2 className="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8 text-black">Featured Destinations</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8 text-black">{t('FeaturedDestinations')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           <Link to="/durban" className="block">
             <div 
@@ -60,7 +62,7 @@ function Home() {
               }}
             >
               <div className="bg-black bg-opacity-50 h-full flex items-center justify-center rounded-lg">
-                <h3 className="text-xl sm:text-2xl font-semibold text-white">Durban</h3>
+                <h3 className="text-xl sm:text-2xl font-semibold text-white">{t('Durban')}</h3>
               </div>
             </div>
           </Link>
@@ -72,7 +74,7 @@ function Home() {
               }}
             >
               <div className="bg-black bg-opacity-50 h-full flex items-center justify-center rounded-lg">
-                <h3 className="text-xl sm:text-2xl font-semibold text-white">Cape Town</h3>
+                <h3 className="text-xl sm:text-2xl font-semibold text-white">{t('CapeTown')}</h3>
               </div>
             </div>
           </Link>
@@ -84,7 +86,7 @@ function Home() {
               }}
             >
               <div className="bg-black bg-opacity-50 h-full flex items-center justify-center rounded-lg">
-                <h3 className="text-xl sm:text-2xl font-semibold text-white">Bangkok</h3>
+                <h3 className="text-xl sm:text-2xl font-semibold text-white">{t('Bangkok')}</h3>
               </div>
             </div>
           </Link>
