@@ -10,7 +10,7 @@ function Durban() {
   const { fetchData } = useAccommodations('durban');
 
   useEffect(() => {
-    let isMounted = true; 
+    let isMounted = true;
 
     const loadData = async () => {
       try {
@@ -30,7 +30,7 @@ function Durban() {
     loadData();
 
     return () => {
-      isMounted = false; 
+      isMounted = false;
     };
   }, [fetchData]);
 
