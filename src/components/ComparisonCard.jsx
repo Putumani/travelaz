@@ -1,16 +1,65 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { incrementHotelView } from '../utils/hotelViews';
 import LoadingSpinner from './LoadingSpinner';
 import { CurrencyContext } from '../context/CurrencyContext';
 import { useTranslation } from '../i18n/useTranslation';
+import { supabase } from '../lib/supabaseClient';
+import DatePicker from 'react-date-picker';
+import 'react-date-picker/dist/DatePicker.css';
+import 'react-calendar/dist/Calendar.css';
 
 function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [isUpdatingViews, setIsUpdatingViews] = useState(false);
   const [lastClickedDeal, setLastClickedDeal] = useState(null);
   const { convertAmount, getCurrencySymbol } = useContext(CurrencyContext);
   const { t } = useTranslation();
+  const [availability, setAvailability] = useState(null);
+  const [loadingAvailability, setLoadingAvailability] = useState(true);
+  const [checkIn, setCheckIn] = useState(new Date());
+  const [checkOut, setCheckOut] = useState(new Date(new Date().setDate(new Date().getDate() + 1)));
 
-  if (!isOpen) return null;
+  // Fetch availability based on selected dates
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAvailability = async () => {
+      if (!accommodation) {
+        setLoadingAvailability(false);
+        return;
+      }
+      setLoadingAvailability(true);
+      try {
+        const checkInStr = checkIn.toISOString().split('T')[0];
+        const checkOutStr = checkOut.toISOString().split('T')[0];
+        const { data, error } = await supabase
+          .from('accommodations')
+          .select('*')
+          .eq('name', accommodation.name)
+          .eq('check_in', checkInStr)
+          .eq('check_out', checkOutStr)
+          .eq('currency', accommodation.currency || 'ZAR')
+          .single();
+
+        if (isMounted && !error) {
+          setAvailability(data);
+        } else if (error) {
+          console.error('Availability fetch error:', error);
+        }
+      } catch (err) {
+        if (isMounted) console.error('Availability fetch error:', err);
+      } finally {
+        if (isMounted) setLoadingAvailability(false);
+      }
+    };
+
+    if (checkIn && checkOut && accommodation) {
+      fetchAvailability();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accommodation, accommodation?.name, accommodation?.currency, checkIn, checkOut]);
 
   const handleViewDealClick = async (e, deal) => {
     e.preventDefault();
@@ -36,6 +85,14 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     }
   };
 
+  // Merge affiliate_deals with availability status
+  const deals = accommodation?.affiliate_deals?.map((deal) => ({
+    ...deal,
+    available: availability?.available || (deal.price > 0 ? t('Available') : t('SoldOut')),
+  })) || [];
+
+  if (!isOpen) return null;
+
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
@@ -51,19 +108,23 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14V4zM6 7H5v12c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V7H6z" />
               </svg>
-              <span className="text-sm">{t('CheckIn', { date: '12 May 2025' })}</span>
+              <span className="text-sm">
+                {t('CheckIn', { date: checkIn.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) })}
+              </span>
             </div>
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14V4zM6 7H5v12c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V7H6z" />
               </svg>
-              <span className="text-sm">{t('CheckOut', { date: '15 May 2025' })}</span>
+              <span className="text-sm">
+                {t('CheckOut', { date: checkOut.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) })}
+              </span>
             </div>
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
               </svg>
-              <span className="text-sm">{t('Guests', { rooms: 2, guests: 4 })}</span>
+              <span className="text-sm">{t('Guests', { rooms: 1, guests: 2 })}</span> {/* Adjust dynamically if needed */}
             </div>
           </div>
           <button onClick={onClose} className="text-white hover:text-gray-300">
@@ -78,9 +139,38 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           </button>
         </div>
 
-        <div className="max-h-[400px] overflow-y-auto">
-          {accommodation?.affiliate_deals?.length > 0 ? (
-            accommodation.affiliate_deals
+        {/* Booking Widget */}
+        <div className="mb-4">
+          <h4 className="text-lg font-semibold">{t('SelectDates')}</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+            <div>
+              <label className="block text-sm">{t('CheckIn')}</label>
+              <DatePicker
+                onChange={setCheckIn}
+                value={checkIn}
+                minDate={new Date()}
+                className="w-full border rounded p-2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm">{t('CheckOut')}</label>
+              <DatePicker
+                onChange={setCheckOut}
+                value={checkOut}
+                minDate={checkIn || new Date()}
+                className="w-full border rounded p-2"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="max-h-[300px] overflow-y-auto">
+          {loadingAvailability ? (
+            <div className="text-center py-6">
+              <LoadingSpinner size="medium" />
+            </div>
+          ) : deals.length > 0 ? (
+            deals
               .sort((a, b) => a.price - b.price)
               .map((deal, index) => (
                 <div
@@ -100,9 +190,9 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                   </div>
                   <div className="flex items-center space-x-4">
                     <span
-                      className={`text-xs ${deal.price > 0 ? 'text-green-600' : 'text-red-600'}`}
+                      className={`text-xs ${deal.available === t('Available') ? 'text-green-600' : 'text-red-600'}`}
                     >
-                      {deal.price > 0 ? t('Available') : t('SoldOut')}
+                      {deal.available}
                     </span>
                     <span className="font-bold text-lg whitespace-nowrap">
                       {getCurrencySymbol()}
