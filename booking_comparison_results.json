@@ -1,0 +1,27 @@
+[
+  {
+    "hotel_name": "President Hotel",
+    "checkin_date": "2025-06-14",
+    "checkout_date": "2025-06-15",
+    "occupants": 2,
+    "room_type": "Classic Room",
+    "price": "1883",
+    "currency": "ZAR",
+    "taxes_and_charges": "19",
+    "total_price": "1902",
+    "breakfast_included": "Yes",
+    "free_cancellation": "Restricted",
+    "rating": {
+      "score": "8.5",
+      "description": "Scored 8.5",
+      "review_count": "8.5"
+    },
+    "location_score": "Not rated",
+    "address": "Sea Point, Cape Town",
+    "stay_duration": "1 night, 2 adults",
+    "availability": "Available",
+    "timestamp": "2025-06-14T05:43:58.049164",
+    "source": "Booking.com",
+    "search_url": "https://www.booking.com/searchresults.en-gb.html?aid=2276376&label=msn-bDVsGoYGna9RvPm%2ALrXBvg-80814255876005%3Atikwd-80814447092161%3Aloc-168%3Aneo%3Amte%3Alp137812%3Adec%3AqsPresident+Hotel+Sea+Point+booking.com&highlighted_hotels=15195&checkin=2025-06-14&redirected=1&city=-1217214&hlrd=with_av&source=hotel&checkout=2025-06-15&keep_landing=1&sid=b67c3091bd6e58f81df1abeb5086b695&group_adults=2&group_children=0"
+  }
+]
