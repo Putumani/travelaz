@@ -12,7 +12,7 @@ export function CurrencyProvider({ children }) {
       setCurrentCurrency(savedCurrency);
     }
     fetchExchangeRates();
-  }, []);
+  }, [currentCurrency]);
 
   const fetchExchangeRates = async () => {
     setIsLoading(true);
@@ -25,22 +25,32 @@ export function CurrencyProvider({ children }) {
       console.error('Error fetching exchange rates:', error);
       setExchangeRates({
         USD: 1,
-        ZAR: 18.5,
+        ZAR: 18.5, // Update this to a current estimate (e.g., ~0.054 USD per ZAR for 2025)
         GBP: 0.79,
         EUR: 0.93,
         AUD: 1.52,
-        THB: 33.5 
+        THB: 33.5
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const convertAmount = (amount) => {
-    if (currentCurrency === 'USD' || !amount) return amount;
-    if (!exchangeRates[currentCurrency]) return amount;
-    
-    return (amount * exchangeRates[currentCurrency]).toFixed(2);
+  const convertAmount = (amount, fromCurrency = 'USD') => {
+    if (!amount || isNaN(amount) || fromCurrency === currentCurrency || !exchangeRates[fromCurrency] || !exchangeRates[currentCurrency]) {
+      console.log(`Conversion skipped: amount=${amount}, from=${fromCurrency}, to=${currentCurrency}, rates=${JSON.stringify(exchangeRates)}`);
+      return amount ? amount.toFixed(2) : '0.00';
+    }
+    const usdRateFrom = 1 / exchangeRates[fromCurrency]; // Convert fromCurrency to USD
+    const usdRateTo = exchangeRates[currentCurrency];   // Convert USD to currentCurrency
+    const amountInUSD = amount * usdRateFrom;
+    const convertedAmount = amountInUSD * usdRateTo;
+    if (isNaN(convertedAmount) || !isFinite(convertedAmount)) {
+      console.error(`Invalid conversion: amount=${amount}, from=${fromCurrency}, to=${currentCurrency}, result=${convertedAmount}`);
+      return amount.toFixed(2); // Fallback to original amount
+    }
+    console.log(`Converting ${amount} ${fromCurrency} to ${currentCurrency}: ${convertedAmount.toFixed(2)} (USD rate: ${usdRateFrom}, ${currentCurrency} rate: ${usdRateTo})`);
+    return convertedAmount.toFixed(2);
   };
 
   const getCurrencySymbol = () => {
@@ -50,7 +60,7 @@ export function CurrencyProvider({ children }) {
       GBP: '£',
       EUR: '€',
       AUD: 'A$',
-      THB: '฿' 
+      THB: '฿'
     };
     return symbols[currentCurrency] || currentCurrency;
   };

@@ -16,6 +16,7 @@ const debounce = (func, wait) => {
 
 function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [deals, setDeals] = useState([]);
+  const [originalDeals, setOriginalDeals] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [checkIn, setCheckIn] = useState(new Date());
@@ -28,27 +29,39 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [children, setChildren] = useState(0);
   const [rooms, setRooms] = useState(1);
   const [alternativeDates, setAlternativeDates] = useState([]);
-  const { convertAmount, getCurrencySymbol } = useContext(CurrencyContext);
+  const [originalAltDates, setOriginalAltDates] = useState([]); 
+  const { convertAmount, getCurrencySymbol, currentCurrency } = useContext(CurrencyContext);
   const { t } = useTranslation();
-  const isFetchingRef = useRef(false); 
-  const lastFetchRef = useRef({ checkIn: null, checkOut: null, adults, children, rooms }); 
+  const isFetchingRef = useRef(false);
+  const lastFetchRef = useRef({ checkIn: null, checkOut: null, adults, children, rooms });
 
   const fetchPrices = useCallback(async () => {
     if (!isOpen || !accommodation || isFetchingRef.current) return;
 
-    const currentParams = { checkIn: checkIn.toISOString().split('T')[0], checkOut: checkOut.toISOString().split('T')[0], adults, children, rooms };
-    if (lastFetchRef.current.checkIn === currentParams.checkIn &&
-        lastFetchRef.current.checkOut === currentParams.checkOut &&
-        lastFetchRef.current.adults === currentParams.adults &&
-        lastFetchRef.current.children === currentParams.children &&
-        lastFetchRef.current.rooms === currentParams.rooms) {
-      return; 
+    const currentParams = {
+      checkIn: checkIn.toISOString().split('T')[0],
+      checkOut: checkOut.toISOString().split('T')[0],
+      adults,
+      children,
+      rooms,
+    };
+    if (
+      lastFetchRef.current.checkIn === currentParams.checkIn &&
+      lastFetchRef.current.checkOut === currentParams.checkOut &&
+      lastFetchRef.current.adults === currentParams.adults &&
+      lastFetchRef.current.children === currentParams.children &&
+      lastFetchRef.current.rooms === currentParams.rooms
+    ) {
+      return;
     }
 
     isFetchingRef.current = true;
     setLoading(true);
     setError(null);
     setAlternativeDates([]);
+    setDeals([]);
+    setOriginalDeals([]);
+    setOriginalAltDates([]);
 
     try {
       const response = await fetch('http://localhost:5000/scrape-booking', {
@@ -76,7 +89,24 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
 
       if (data.error) {
         if (data.alternative_dates) {
-          setAlternativeDates(data.alternative_dates);
+          const convertedAltDates = await Promise.all(
+            data.alternative_dates.map(async (alt) => {
+              const totalPrice = (alt.price || 0) + (alt.taxes || 0);
+              const convertedPrice = await convertAmount(totalPrice, alt.currency || data.data?.currency || 'USD');
+              console.log(`Converting ${totalPrice} ${alt.currency || data.data?.currency || 'USD'} to ${currentCurrency}: ${convertedPrice}`);
+              return {
+                ...alt,
+                price: parseFloat(convertedPrice),
+              };
+            })
+          );
+          const originalAlt = data.alternative_dates.map(alt => ({
+            ...alt,
+            price: (alt.price || 0) + (alt.taxes || 0),
+            currency: alt.currency || data.data?.currency || 'USD',
+          }));
+          setAlternativeDates(convertedAltDates);
+          setOriginalAltDates(originalAlt);
           setError(t('noAvailabilityWithAlternatives'));
         } else {
           setError(data.error);
@@ -84,17 +114,30 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         return;
       }
 
+      const totalPrice = (data.data.price || 0) + (data.data.taxes || 0);
+      const convertedPrice = await convertAmount(totalPrice, data.data.currency || 'USD');
+      console.log(`Converting ${totalPrice} ${data.data.currency} to ${currentCurrency}: ${convertedPrice}`);
+
       const bookingDeal = {
         site_name: 'Booking.com',
-        price: data.data.price,
-        currency: data.data.currency,
+        price: parseFloat(convertedPrice),
+        currency: currentCurrency,
+        available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
+        affiliate_url: accommodation.booking_dot_com_affiliate_url,
+        roomType: data.data.room_type,
+      };
+      const originalDeal = {
+        site_name: 'Booking.com',
+        price: totalPrice,
+        currency: data.data.currency || 'USD',
         available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
         affiliate_url: accommodation.booking_dot_com_affiliate_url,
         roomType: data.data.room_type,
       };
 
       setDeals([bookingDeal]);
-      lastFetchRef.current = { ...currentParams }; // Update last fetched params
+      setOriginalDeals([originalDeal]);
+      lastFetchRef.current = { ...currentParams };
     } catch (err) {
       console.error('Fetch error:', err);
       setError(t('scrapingFailed'));
@@ -102,7 +145,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t]);
+  }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount]);
 
   const debouncedFetchPrices = useCallback(debounce(fetchPrices, 1000), [fetchPrices]);
 
@@ -111,6 +154,23 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       debouncedFetchPrices();
     }
   };
+
+  useEffect(() => {
+    if ((deals.length > 0 || alternativeDates.length > 0) && originalDeals.length > 0 && originalAltDates.length >= 0) {
+      const reconvertDeals = originalDeals.map(deal => ({
+        ...deal,
+        price: parseFloat(convertAmount(deal.price, deal.currency)),
+      }));
+      const reconvertAltDates = originalAltDates.map(alt => ({
+        ...alt,
+        price: parseFloat(convertAmount(alt.price, alt.currency)),
+      }));
+      setDeals(reconvertDeals);
+      setAlternativeDates(reconvertAltDates);
+    } else if (isOpen && !isFetchingRef.current) {
+      debouncedFetchPrices(); // Re-fetch if no original data
+    }
+  }, [currentCurrency, convertAmount, deals, alternativeDates, originalDeals, originalAltDates, isOpen, debouncedFetchPrices]);
 
   useEffect(() => {
     if (isOpen && !isFetchingRef.current) {
@@ -170,15 +230,15 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
 
   const AlternativeDatesList = () => (
     <div className="mt-4">
-      <h4 className="font-medium mb-2">{t('tryTheseDates')}:</h4>
+      <h4 className="font-medium mb-2">{t('tryTheseDates')}</h4>
       <div className="grid grid-cols-2 gap-2">
         {alternativeDates.map((alt, i) => (
           <div key={i} className="p-2 border rounded bg-gray-50">
             <div className="font-medium">{alt.dates}</div>
-            <div className="text-sm">{alt.nights}</div>
+            <div className="text-sm">{t('Nights', { count: alt.nights })}</div>
             <div className="text-green-600 font-bold">
               {getCurrencySymbol()}
-              {convertAmount(alt.price)}
+              {alt.price.toFixed(2)}
             </div>
           </div>
         ))}
@@ -261,13 +321,18 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                       </div>
                       <div>
                         <div className="font-medium">{deal.site_name}</div>
-                        <div className="text-xs text-gray-500">{deal.available}</div>
+                        <div className={`text-xs ${deal.available === t('Available') ? 'text-green-600' : 'text-red-600'}`}>
+                          {deal.available}
+                        </div>
+                        {deal.roomType && (
+                          <div className="text-xs text-gray-500">{deal.roomType}</div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center">
                       <span className="font-bold mr-4">
-                        {deal.currency || getCurrencySymbol()}
-                        {convertAmount(deal.price)}
+                        {getCurrencySymbol()}
+                        {deal.price.toFixed(2)}
                       </span>
                       <a
                         href={deal.affiliate_url}

@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import ComparisonCard from './ComparisonCard';
@@ -7,8 +7,30 @@ import { useTranslation } from '../i18n/useTranslation';
 
 function AccommodationCard({ accommodation }) {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [convertedPrice, setConvertedPrice] = useState(null);
+  const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const { convertAmount, getCurrencySymbol } = useContext(CurrencyContext);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    const updatePrice = async () => {
+      if (accommodation?.price != null && typeof accommodation.price === 'number') {
+        setIsLoadingPrice(true);
+        try {
+          const price = await convertAmount(accommodation.price, 'USD'); 
+          setConvertedPrice(price);
+        } catch (error) {
+          console.error('Error converting price:', error);
+          setConvertedPrice(accommodation.price.toFixed(2)); 
+        } finally {
+          setIsLoadingPrice(false);
+        }
+      } else {
+        setConvertedPrice(null); 
+      }
+    };
+    updatePrice();
+  }, [accommodation, convertAmount]);
 
   const handleCardClick = () => {
     setIsPopupOpen(true);
@@ -19,7 +41,7 @@ function AccommodationCard({ accommodation }) {
     setIsPopupOpen(true);
   };
 
-  if (!accommodation) {
+  if (!accommodation || !accommodation.name) {
     return (
       <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 min-h-[300px] animate-pulse">
         <div className="h-40 bg-gray-200"></div>
@@ -66,23 +88,42 @@ function AccommodationCard({ accommodation }) {
         >
           {accommodation.name}
         </h3>
-        <p className="text-gray-600 text-sm mb-2 line-clamp-1">{accommodation.description}</p>
+        <p className="text-gray-600 text-sm mb-2 line-clamp-1">
+          {accommodation.description || t('noDescription', { defaultValue: 'No description available' })}
+        </p>
 
         <div className="flex items-center justify-between mt-auto">
           <div>
-            <p className="text-gray-900 font-medium">
-              {getCurrencySymbol()}
-              {convertAmount(accommodation.price)}
-              <span className="text-gray-500 text-sm"> {t('PerNight')}</span>
-            </p>
+            {isLoadingPrice ? (
+              <p className="text-gray-900 font-medium animate-pulse">
+                {t('loadingPrice', { defaultValue: 'Loading price...' })}
+              </p>
+            ) : (
+              <p className="text-gray-900 font-medium">
+                {convertedPrice ? (
+                  <>
+                    {getCurrencySymbol()}
+                    {convertedPrice}
+                    <span className="text-gray-500 text-sm"> {t('PerNight')}</span>
+                  </>
+                ) : (
+                  <span className="text-gray-500 text-sm">
+                    {t('priceNotAvailable', { defaultValue: 'Price not available' })}
+                  </span>
+                )}
+              </p>
+            )}
             <div className="flex items-center">
               <span className="text-yellow-500">★</span>
-              <span className="text-gray-700 ml-1 text-sm">{accommodation.rating}</span>
+              <span className="text-gray-700 ml-1 text-sm">
+                {accommodation.rating || t('noRating', { defaultValue: 'N/A' })}
+              </span>
             </div>
           </div>
           <button
             onClick={handleBookClick}
             className="px-4 py-2 bg-black hover:bg-gray-800 text-white text-sm font-medium rounded transition-colors"
+            disabled={isLoadingPrice}
           >
             {t('BookNow')}
           </button>

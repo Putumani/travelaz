@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import AccommodationCard from '@/components/AccommodationCard';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { useTranslation } from '../i18n/useTranslation';
 
 function Home() {
@@ -28,7 +29,11 @@ function Home() {
       }
 
       console.log('Popular hotels data:', data);
-      setPopularHotels(data);
+      // Filter out hotels with missing required fields
+      const validHotels = data.filter(hotel => 
+        hotel.id && hotel.name && typeof hotel.price === 'number' && hotel.rating
+      );
+      setPopularHotels(validHotels);
     };
 
     fetchPopularHotels();
@@ -44,7 +49,9 @@ function Home() {
             <div className="text-center text-red-500">{errorMessage}</div>
           ) : popularHotels.length > 0 ? (
             popularHotels.map((hotel) => (
-              <AccommodationCard key={hotel.id} accommodation={hotel} />
+              <ErrorBoundary key={hotel.id}>
+                <AccommodationCard accommodation={hotel} />
+              </ErrorBoundary>
             ))
           ) : (
             <div className="text-center text-gray-500">{t('NoHotelsAvailable')}</div>
