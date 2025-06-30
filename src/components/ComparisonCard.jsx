@@ -6,14 +6,6 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import LoadingSpinner from './LoadingSpinner';
 
-const debounce = (func, wait) => {
-  let timeout;
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-};
-
 function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [deals, setDeals] = useState([]);
   const [originalDeals, setOriginalDeals] = useState([]); 
@@ -33,7 +25,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const { convertAmount, getCurrencySymbol, currentCurrency } = useContext(CurrencyContext);
   const { t } = useTranslation();
   const isFetchingRef = useRef(false);
-  const lastFetchRef = useRef({ checkIn: null, checkOut: null, adults, children, rooms });
+  const hasInitialFetchRef = useRef(false);
 
   const fetchPrices = useCallback(async () => {
     if (!isOpen || !accommodation || isFetchingRef.current) return;
@@ -45,15 +37,6 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       children,
       rooms,
     };
-    if (
-      lastFetchRef.current.checkIn === currentParams.checkIn &&
-      lastFetchRef.current.checkOut === currentParams.checkOut &&
-      lastFetchRef.current.adults === currentParams.adults &&
-      lastFetchRef.current.children === currentParams.children &&
-      lastFetchRef.current.rooms === currentParams.rooms
-    ) {
-      return;
-    }
 
     isFetchingRef.current = true;
     setLoading(true);
@@ -137,7 +120,6 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
 
       setDeals([bookingDeal]);
       setOriginalDeals([originalDeal]);
-      lastFetchRef.current = { ...currentParams };
     } catch (err) {
       console.error('Fetch error:', err);
       setError(t('scrapingFailed'));
@@ -147,13 +129,12 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     }
   }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount]);
 
-  const debouncedFetchPrices = useCallback(debounce(fetchPrices, 1000), [fetchPrices]);
-
-  const handleUpdateSearch = () => {
-    if (!isFetchingRef.current) {
-      debouncedFetchPrices();
+  useEffect(() => {
+    if (isOpen && !hasInitialFetchRef.current) {
+      hasInitialFetchRef.current = true;
+      fetchPrices();
     }
-  };
+  }, [isOpen, fetchPrices]);
 
   useEffect(() => {
     if ((deals.length > 0 || alternativeDates.length > 0) && originalDeals.length > 0 && originalAltDates.length >= 0) {
@@ -167,16 +148,8 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       }));
       setDeals(reconvertDeals);
       setAlternativeDates(reconvertAltDates);
-    } else if (isOpen && !isFetchingRef.current) {
-      debouncedFetchPrices(); // Re-fetch if no original data
     }
-  }, [currentCurrency, convertAmount, deals, alternativeDates, originalDeals, originalAltDates, isOpen, debouncedFetchPrices]);
-
-  useEffect(() => {
-    if (isOpen && !isFetchingRef.current) {
-      debouncedFetchPrices();
-    }
-  }, [isOpen, debouncedFetchPrices]);
+  }, [currentCurrency, convertAmount, deals, alternativeDates, originalDeals, originalAltDates]);
 
   const GuestControls = () => (
     <div className="grid grid-cols-3 gap-4 mt-2">
@@ -184,10 +157,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         <label className="block text-sm">{t('Adults')}</label>
         <select
           value={adults}
-          onChange={(e) => {
-            setAdults(Number(e.target.value));
-            handleUpdateSearch();
-          }}
+          onChange={(e) => setAdults(Number(e.target.value))}
           className="w-full border rounded p-2"
         >
           {[1, 2, 3, 4].map((num) => (
@@ -199,10 +169,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         <label className="block text-sm">{t('Children')}</label>
         <select
           value={children}
-          onChange={(e) => {
-            setChildren(Number(e.target.value));
-            handleUpdateSearch();
-          }}
+          onChange={(e) => setChildren(Number(e.target.value))}
           className="w-full border rounded p-2"
         >
           {[0, 1, 2, 3].map((num) => (
@@ -214,10 +181,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         <label className="block text-sm">{t('Rooms')}</label>
         <select
           value={rooms}
-          onChange={(e) => {
-            setRooms(Number(e.target.value));
-            handleUpdateSearch();
-          }}
+          onChange={(e) => setRooms(Number(e.target.value))}
           className="w-full border rounded p-2"
         >
           {[1, 2, 3].map((num) => (
@@ -265,10 +229,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
               <div>
                 <label className="block text-sm mb-1">{t('checkIn')}</label>
                 <DatePicker
-                  onChange={(date) => {
-                    setCheckIn(date);
-                    handleUpdateSearch();
-                  }}
+                  onChange={setCheckIn}
                   value={checkIn}
                   minDate={new Date()}
                   className="w-full"
@@ -277,10 +238,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
               <div>
                 <label className="block text-sm mb-1">{t('checkOut')}</label>
                 <DatePicker
-                  onChange={(date) => {
-                    setCheckOut(date);
-                    handleUpdateSearch();
-                  }}
+                  onChange={setCheckOut}
                   value={checkOut}
                   minDate={checkIn}
                   className="w-full"
@@ -289,7 +247,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             </div>
             <GuestControls />
             <button
-              onClick={handleUpdateSearch}
+              onClick={fetchPrices}
               disabled={loading || isFetchingRef.current}
               className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-blue-400"
             >
