@@ -28,7 +28,7 @@ def setup_driver():
     with _driver_lock:
         if _driver is not None:
             try:
-                _driver.quit()  
+                _driver.quit()
             except Exception:
                 pass
         options = webdriver.ChromeOptions()
@@ -98,96 +98,71 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
             try:
                 driver.get(search_url)
                 WebDriverWait(driver, 20).until(
-                    lambda d: d.find_elements(By.CSS_SELECTOR, "[data-testid='property-header'], [data-testid='property-card']")
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-card']"))
                 )
                 break
             except Exception as e:
                 if attempt == max_retries - 1:
                     raise
                 logger.warning(f"Attempt {attempt + 1} failed, retrying...")
-                time.sleep(2)
+                time.sleep(random.uniform(2, 4))
         
-        is_hotel_page = len(driver.find_elements(By.CSS_SELECTOR, "[data-testid='property-header']")) > 0
+        with open('page_content.html', 'w', encoding='utf-8') as f:
+            f.write(driver.page_source)
         
-        if not is_hotel_page:
-            try:
-                hotel_card = driver.find_element(By.CSS_SELECTOR, "[data-testid='property-card']")
-                view_deal_btn = hotel_card.find_element(By.CSS_SELECTOR, "[data-testid='availability-cta']")
-                view_deal_btn.click()
-                WebDriverWait(driver, 20).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-header']"))
-                )
-            except Exception as e:
-                logger.error("Could not navigate to hotel page from search results")
-                return {"error": "Could not navigate to hotel page"}
+        hotel_card = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-card']"))
+        )
+        
+        hotel_name = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='title']").text
+        rating = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='review-score'] .dff2e52086").text
+        reviews = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='review-score'] .fff1944c52.fb14de7f14.eaa8455879").text
+        location = hotel_card.find_element(By.CSS_SELECTOR, "span[data-testid='address']").text
+        distance = hotel_card.find_element(By.CSS_SELECTOR, "span[data-testid='distance']").text
+        availability_url = hotel_card.find_element(By.CSS_SELECTOR, "a[data-testid='availability-cta-btn']").get_attribute("href")
+        currency = detect_currency(hotel_card.text)
+        room_type = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='recommended-units'] h4").text
 
         try:
-            hotel_name_element = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-header'] h2"))
-            )
-            hotel_name = hotel_name_element.text
-        except TimeoutException:
-            logger.error("Hotel name element not found")
-            return {"error": "Hotel page elements not found"}
-
-        try:
-            room_containers = WebDriverWait(driver, 20).until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[data-testid='property-room-card']"))
-            )
-            if not room_containers:
-                logger.warning("No room containers found")
-                return {"error": "No available rooms found"}
-            
-            room = room_containers[0]
-            
-            try:
-                room_type_element = room.find_element(By.CSS_SELECTOR, "[data-testid='room-type-name']")
-                room_type = room_type_element.text
-            except NoSuchElementException:
-                room_type = "Standard Room"
-
-            try:
-                price_element = room.find_element(By.CSS_SELECTOR, "[data-testid='price-and-discounted-price']")
-                price = extract_price(price_element.text)
-            except NoSuchElementException:
+            price_element = hotel_card.find_element(By.CSS_SELECTOR, "span[data-testid='price-and-discounted-price']")
+            price = extract_price(price_element.text)
+            taxes_info = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='taxes-and-charges']").text
+            taxes = 0 if "Includes taxes and charges" in taxes_info else None
+            availability = "Available" if price else "Not available"
+        except NoSuchElementException:
+            logger.warning("Price element not found, checking for unavailability indicators")
+            unavailability_indicators = hotel_card.find_elements(By.XPATH, "//*[contains(text(), 'No availability') or contains(text(), 'Sold out')]")
+            if unavailability_indicators:
                 price = None
+                taxes = None
+                availability = "Not available"
+            else:
+                price = None
+                taxes = None
+                availability = "Unknown availability (price missing)"
 
-            try:
-                taxes_element = room.find_element(By.CSS_SELECTOR, "[data-testid='taxes-and-charges']")
-                taxes = extract_price(taxes_element.text.replace("+", "").replace(" taxes and charges", ""))
-            except NoSuchElementException:
-                taxes = 0
-
-            try:
-                amenities = room.find_elements(By.CSS_SELECTOR, ".c-occupancy-icons + div")
-                breakfast_included = any("Breakfast" in elem.text for elem in amenities)
-                free_cancellation = any("FREE cancellation" in elem.text for elem in amenities)
-            except NoSuchElementException:
-                breakfast_included = False
-                free_cancellation = False
-
-            result = {
-                "hotel_name": hotel_name,
-                "price": price,
-                "taxes": taxes,
-                "currency": detect_currency(driver.page_source),
-                "availability": "Available" if price else "Not available",
-                "checkin_date": checkin_date,
-                "checkout_date": checkout_date,
-                "room_type": room_type,
-                "breakfast_included": breakfast_included,
-                "free_cancellation": free_cancellation,
-                "source_url": search_url
-            }
-            logger.info(f"Scraped data: {result}")
-            return result
-
-        except Exception as e:
-            logger.error(f"Error scraping room details: {str(e)}")
-            return {"error": f"Error scraping room details: {str(e)}"}
+        result = {
+            "hotel_name": hotel_name,
+            "rating": rating,
+            "reviews": reviews,
+            "location": location,
+            "distance_from_center": distance,
+            "price": price,
+            "taxes": taxes,
+            "currency": currency,
+            "availability": availability,
+            "checkin_date": checkin_date,
+            "checkout_date": checkout_date,
+            "room_type": room_type,
+            "source_url": availability_url
+        }
+        logger.info(f"Scraped data: {result}")
+        return result
 
     except Exception as e:
         logger.error(f"Scraping error: {str(e)}")
+        with open('error_page_content.html', 'w', encoding='utf-8') as f:
+            f.write(driver.page_source)
         return {"error": str(e)}
     finally:
         try:
