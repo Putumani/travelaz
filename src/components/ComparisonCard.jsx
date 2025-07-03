@@ -47,6 +47,10 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     setOriginalAltDates([]);
 
     try {
+      if (!accommodation.booking_dot_com_affiliate_url) {
+        throw new Error("No Booking.com URL available for this hotel");
+      }
+
       const response = await fetch('http://localhost:5000/scrape-booking', {
         method: 'POST',
         headers: {
@@ -54,7 +58,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           'Accept': 'application/json',
         },
         body: JSON.stringify({
-          hotelName: accommodation.name,
+          hotelUrl: accommodation.booking_dot_com_affiliate_url,
           checkIn: currentParams.checkIn,
           checkOut: currentParams.checkOut,
           adults,
@@ -76,7 +80,6 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             data.alternative_dates.map(async (alt) => {
               const totalPrice = (alt.price || 0) + (alt.taxes || 0);
               const convertedPrice = await convertAmount(totalPrice, alt.currency || data.data?.currency || 'USD');
-              console.log(`Converting ${totalPrice} ${alt.currency || data.data?.currency || 'USD'} to ${currentCurrency}: ${convertedPrice}`);
               return {
                 ...alt,
                 price: parseFloat(convertedPrice),
@@ -99,14 +102,13 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
 
       const totalPrice = (data.data.price || 0) + (data.data.taxes || 0);
       const convertedPrice = await convertAmount(totalPrice, data.data.currency || 'USD');
-      console.log(`Converting ${totalPrice} ${data.data.currency} to ${currentCurrency}: ${convertedPrice}`);
 
       const bookingDeal = {
         site_name: 'Booking.com',
         price: parseFloat(convertedPrice),
         currency: currentCurrency,
         available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
-        affiliate_url: accommodation.booking_dot_com_affiliate_url,
+        affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
         roomType: data.data.room_type,
       };
       const originalDeal = {
@@ -114,7 +116,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         price: totalPrice,
         currency: data.data.currency || 'USD',
         available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
-        affiliate_url: accommodation.booking_dot_com_affiliate_url,
+        affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
         roomType: data.data.room_type,
       };
 
@@ -122,7 +124,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       setOriginalDeals([originalDeal]);
     } catch (err) {
       console.error('Fetch error:', err);
-      setError(t('scrapingFailed'));
+      setError(err.message || t('scrapingFailed'));
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
