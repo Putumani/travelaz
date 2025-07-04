@@ -36,9 +36,9 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const { t } = useTranslation();
   const isFetchingRef = useRef(false);
   const hasInitialFetchRef = useRef(false);
-  const lastSuccessfulDataRef = useRef(null); 
-  const lastParamsRef = useRef(null); 
-  const abortControllerRef = useRef(null); 
+  const lastSuccessfulDataRef = useRef(null); // Store last successful scrape data
+  const lastParamsRef = useRef(null); // Store last used parameters
+  const abortControllerRef = useRef(null); // For canceling fetch requests
 
   const fetchPrices = useCallback(async (forceFetch = false) => {
     if (!isOpen || !accommodation || isFetchingRef.current) return;
@@ -54,9 +54,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       rooms,
     };
 
+    // Check if parameters have changed since last successful fetch
     const paramsChanged = !lastParamsRef.current || JSON.stringify(currentParams) !== JSON.stringify(lastParamsRef.current);
 
     if (!forceFetch && !paramsChanged && lastSuccessfulDataRef.current) {
+      // Reuse last successful data if parameters haven't changed
       setDeals(lastSuccessfulDataRef.current.deals);
       setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
       setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
@@ -69,6 +71,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     setLoading(true);
     setError(null);
 
+    // Create a new AbortController for this request
     abortControllerRef.current = new AbortController();
 
     try {
@@ -131,10 +134,12 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           result.error = t('noAvailabilityWithAlternatives');
         }
 
+        // Only update lastSuccessfulDataRef if alternativeDates are meaningful
         if (result.alternativeDates.length > 0) {
           lastSuccessfulDataRef.current = { ...result, params: currentParams };
           lastParamsRef.current = currentParams;
         } else if (lastSuccessfulDataRef.current) {
+          // Revert to last successful data
           setDeals(lastSuccessfulDataRef.current.deals);
           setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
           setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
@@ -180,8 +185,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         params: currentParams,
       };
 
-      lastSuccessfulDataRef.current = result;
-      lastParamsRef.current = currentParams;
+      // Only store successful data if deals are present
+      if (result.deals.length > 0) {
+        lastSuccessfulDataRef.current = result;
+        lastParamsRef.current = currentParams;
+      }
 
       setDeals(result.deals);
       setOriginalDeals(result.originalDeals);
@@ -191,12 +199,24 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     } catch (err) {
       if (err.name === 'AbortError') {
         console.log('Fetch aborted');
+        // Revert to last successful data and parameters if available
         if (lastSuccessfulDataRef.current) {
           setDeals(lastSuccessfulDataRef.current.deals);
           setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
           setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
           setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
           setError(lastSuccessfulDataRef.current.error);
+          setCheckIn(new Date(lastSuccessfulDataRef.current.params.checkIn));
+          setCheckOut(new Date(lastSuccessfulDataRef.current.params.checkOut));
+          setAdults(lastSuccessfulDataRef.current.params.adults);
+          setChildren(lastSuccessfulDataRef.current.params.children);
+          setRooms(lastSuccessfulDataRef.current.params.rooms);
+        } else {
+          setDeals([]);
+          setOriginalDeals([]);
+          setAlternativeDates([]);
+          setOriginalAltDates([]);
+          setError(null); // Clear error to allow re-scrape on reopen
         }
       } else {
         console.error('Fetch error:', err);
@@ -222,31 +242,38 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     }
   }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount]);
 
+  // Initialize parameters and data when card opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !hasInitialFetchRef.current) {
       if (lastSuccessfulDataRef.current && lastParamsRef.current) {
-        setCheckIn(new Date(lastParamsRef.current.checkIn));
-        setCheckOut(new Date(lastParamsRef.current.checkOut));
-        setAdults(lastParamsRef.current.adults);
-        setChildren(lastParamsRef.current.children);
-        setRooms(lastParamsRef.current.rooms);
+        // Restore last successful data and parameters on first open
         setDeals(lastSuccessfulDataRef.current.deals);
         setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
         setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
         setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
         setError(lastSuccessfulDataRef.current.error);
+        setCheckIn(new Date(lastParamsRef.current.checkIn));
+        setCheckOut(new Date(lastParamsRef.current.checkOut));
+        setAdults(lastParamsRef.current.adults);
+        setChildren(lastParamsRef.current.children);
+        setRooms(lastParamsRef.current.rooms);
+      } else {
+        // Trigger fetch if no successful data exists
+        fetchPrices(true);
       }
-      if (!hasInitialFetchRef.current) {
-        hasInitialFetchRef.current = true;
-        fetchPrices(true); 
-      }
-    } else {
+      hasInitialFetchRef.current = true; // Mark as initialized
+    } else if (isOpen && !lastSuccessfulDataRef.current) {
+      // Trigger fetch on reopen if no successful data exists
+      fetchPrices(true);
+    } else if (!isOpen) {
+      // Cancel ongoing fetch when closing
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     }
   }, [isOpen, fetchPrices]);
 
+  // Handle currency changes
   useEffect(() => {
     if ((deals.length > 0 || alternativeDates.length > 0) && originalDeals.length > 0 && originalAltDates.length >= 0) {
       const reconvertDeals = originalDeals.map(deal => ({
@@ -259,6 +286,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       }));
       setDeals(reconvertDeals);
       setAlternativeDates(reconvertAltDates);
+      // Update last successful data with reconverted prices
       if (lastSuccessfulDataRef.current) {
         lastSuccessfulDataRef.current = {
           ...lastSuccessfulDataRef.current,
@@ -269,8 +297,9 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     }
   }, [currentCurrency, convertAmount, deals, alternativeDates, originalDeals, originalAltDates]);
 
+  // Handle updates to search parameters
   const handleUpdateSearch = () => {
-    fetchPrices(true); 
+    fetchPrices(true); // Force fetch on update
   };
 
   const GuestControls = () => (
