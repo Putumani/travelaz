@@ -5,6 +5,8 @@ import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import LoadingSpinner from './LoadingSpinner';
+import InputNumber from 'rc-input-number';
+import 'rc-input-number/assets/index.css'; // Import default styles
 
 function formatDateToLocal(date) {
   if (!date) return '';
@@ -171,39 +173,51 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     <div className="grid grid-cols-3 gap-4 mt-2">
       <div>
         <label className="block text-sm">{t('Adults')}</label>
-        <select
+        <InputNumber
+          min={1}
+          max={30}
           value={adults}
-          onChange={(e) => setAdults(Number(e.target.value))}
-          className="w-full border rounded p-2"
-        >
-          {[1, 2, 3, 4].map((num) => (
-            <option key={num} value={num}>{num}</option>
-          ))}
-        </select>
+          onChange={(value) => setAdults(value != null ? value : 2)}
+          className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label={t('Adults')}
+          autoFocus={false}
+          upHandler={<span className="text-gray-500">+</span>}
+          downHandler={<span className="text-gray-500">-</span>}
+          formatter={(value) => `${value}`}
+          parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 2)}
+        />
       </div>
       <div>
         <label className="block text-sm">{t('Children')}</label>
-        <select
+        <InputNumber
+          min={0}
+          max={9}
           value={children}
-          onChange={(e) => setChildren(Number(e.target.value))}
-          className="w-full border rounded p-2"
-        >
-          {[0, 1, 2, 3].map((num) => (
-            <option key={num} value={num}>{num}</option>
-          ))}
-        </select>
+          onChange={(value) => setChildren(value != null ? value : 0)}
+          className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label={t('Children')}
+          autoFocus={false}
+          upHandler={<span className="text-gray-500">+</span>}
+          downHandler={<span className="text-gray-500">-</span>}
+          formatter={(value) => `${value}`}
+          parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 0)}
+        />
       </div>
       <div>
         <label className="block text-sm">{t('Rooms')}</label>
-        <select
+        <InputNumber
+          min={1}
+          max={30}
           value={rooms}
-          onChange={(e) => setRooms(Number(e.target.value))}
-          className="w-full border rounded p-2"
-        >
-          {[1, 2, 3].map((num) => (
-            <option key={num} value={num}>{num}</option>
-          ))}
-        </select>
+          onChange={(value) => setRooms(value != null ? value : 1)}
+          className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label={t('Rooms')}
+          autoFocus={false}
+          upHandler={<span className="text-gray-500">+</span>}
+          downHandler={<span className="text-gray-500">-</span>}
+          formatter={(value) => `${value}`}
+          parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 1)}
+        />
       </div>
     </div>
   );
