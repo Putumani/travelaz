@@ -35,16 +35,16 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const { convertAmount, getCurrencySymbol, currentCurrency } = useContext(CurrencyContext);
   const { t } = useTranslation();
   const isFetchingRef = useRef(false);
-  const isPausedRef = useRef(false); // New ref to track pause state
   const hasInitialFetchRef = useRef(false);
+  const lastSuccessfulDataRef = useRef(null); 
+  const lastParamsRef = useRef(null); 
+  const abortControllerRef = useRef(null); 
 
   const fetchPrices = useCallback(async (forceFetch = false) => {
-    if (!isOpen || !accommodation || isFetchingRef.current || (isPausedRef.current && !forceFetch)) return;
+    if (!isOpen || !accommodation || isFetchingRef.current) return;
 
     const checkInStr = formatDateToLocal(checkIn);
     const checkOutStr = formatDateToLocal(checkOut);
-
-    console.log('Sending dates:', { checkIn: checkInStr, checkOut: checkOutStr });
 
     const currentParams = {
       checkIn: checkInStr,
@@ -54,9 +54,22 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       rooms,
     };
 
+    const paramsChanged = !lastParamsRef.current || JSON.stringify(currentParams) !== JSON.stringify(lastParamsRef.current);
+
+    if (!forceFetch && !paramsChanged && lastSuccessfulDataRef.current) {
+      setDeals(lastSuccessfulDataRef.current.deals);
+      setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
+      setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
+      setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
+      setError(lastSuccessfulDataRef.current.error);
+      return;
+    }
+
     isFetchingRef.current = true;
     setLoading(true);
     setError(null);
+
+    abortControllerRef.current = new AbortController();
 
     try {
       if (!accommodation.booking_dot_com_affiliate_url) {
@@ -78,6 +91,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           rooms,
         }),
         credentials: 'omit',
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
@@ -88,6 +102,14 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       console.log('Received response:', data);
 
       if (data.error) {
+        const result = {
+          deals: [],
+          originalDeals: [],
+          alternativeDates: [],
+          originalAltDates: [],
+          error: data.error,
+        };
+
         if (data.alternative_dates) {
           const convertedAltDates = await Promise.all(
             data.alternative_dates.map(async (alt) => {
@@ -104,12 +126,28 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             price: (alt.price || 0) + (alt.taxes || 0),
             currency: alt.currency || data.data?.currency || 'USD',
           }));
-          setAlternativeDates(convertedAltDates);
-          setOriginalAltDates(originalAlt);
-          setError(t('noAvailabilityWithAlternatives'));
-        } else {
-          setError(data.error);
+          result.alternativeDates = convertedAltDates;
+          result.originalAltDates = originalAlt;
+          result.error = t('noAvailabilityWithAlternatives');
         }
+
+        if (result.alternativeDates.length > 0) {
+          lastSuccessfulDataRef.current = { ...result, params: currentParams };
+          lastParamsRef.current = currentParams;
+        } else if (lastSuccessfulDataRef.current) {
+          setDeals(lastSuccessfulDataRef.current.deals);
+          setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
+          setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
+          setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
+          setError(result.error);
+          return;
+        }
+
+        setDeals(result.deals);
+        setOriginalDeals(result.originalDeals);
+        setAlternativeDates(result.alternativeDates);
+        setOriginalAltDates(result.originalAltDates);
+        setError(result.error);
         return;
       }
 
@@ -133,26 +171,79 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         roomType: data.data.room_type,
       };
 
-      setDeals([bookingDeal]);
-      setOriginalDeals([originalDeal]);
+      const result = {
+        deals: [bookingDeal],
+        originalDeals: [originalDeal],
+        alternativeDates: [],
+        originalAltDates: [],
+        error: null,
+        params: currentParams,
+      };
+
+      lastSuccessfulDataRef.current = result;
+      lastParamsRef.current = currentParams;
+
+      setDeals(result.deals);
+      setOriginalDeals(result.originalDeals);
+      setAlternativeDates(result.alternativeDates);
+      setOriginalAltDates(result.originalAltDates);
+      setError(null);
     } catch (err) {
-      console.error('Fetch error:', err);
-      setError(err.message || t('scrapingFailed'));
+      if (err.name === 'AbortError') {
+        console.log('Fetch aborted');
+        if (lastSuccessfulDataRef.current) {
+          setDeals(lastSuccessfulDataRef.current.deals);
+          setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
+          setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
+          setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
+          setError(lastSuccessfulDataRef.current.error);
+        }
+      } else {
+        console.error('Fetch error:', err);
+        const errorMessage = err.message || t('scrapingFailed');
+        if (lastSuccessfulDataRef.current) {
+          setDeals(lastSuccessfulDataRef.current.deals);
+          setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
+          setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
+          setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
+          setError(errorMessage);
+        } else {
+          setError(errorMessage);
+          setDeals([]);
+          setOriginalDeals([]);
+          setAlternativeDates([]);
+          setOriginalAltDates([]);
+        }
+      }
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
+      abortControllerRef.current = null;
     }
   }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount]);
 
   useEffect(() => {
     if (isOpen) {
-      if (!hasInitialFetchRef.current || isPausedRef.current) {
+      if (lastSuccessfulDataRef.current && lastParamsRef.current) {
+        setCheckIn(new Date(lastParamsRef.current.checkIn));
+        setCheckOut(new Date(lastParamsRef.current.checkOut));
+        setAdults(lastParamsRef.current.adults);
+        setChildren(lastParamsRef.current.children);
+        setRooms(lastParamsRef.current.rooms);
+        setDeals(lastSuccessfulDataRef.current.deals);
+        setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
+        setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
+        setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
+        setError(lastSuccessfulDataRef.current.error);
+      }
+      if (!hasInitialFetchRef.current) {
         hasInitialFetchRef.current = true;
-        isPausedRef.current = false; 
         fetchPrices(true); 
       }
     } else {
-      isPausedRef.current = true; 
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     }
   }, [isOpen, fetchPrices]);
 
@@ -168,11 +259,17 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       }));
       setDeals(reconvertDeals);
       setAlternativeDates(reconvertAltDates);
+      if (lastSuccessfulDataRef.current) {
+        lastSuccessfulDataRef.current = {
+          ...lastSuccessfulDataRef.current,
+          deals: reconvertDeals,
+          alternativeDates: reconvertAltDates,
+        };
+      }
     }
   }, [currentCurrency, convertAmount, deals, alternativeDates, originalDeals, originalAltDates]);
 
   const handleUpdateSearch = () => {
-    isPausedRef.current = false; 
     fetchPrices(true); 
   };
 
@@ -258,7 +355,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold">{accommodation.name}</h3>
-            <button onClick={() => { isPausedRef.current = true; onClose(); }} className="text-gray-500 hover:text-gray-700">
+            <button onClick={() => { if (abortControllerRef.current) abortControllerRef.current.abort(); onClose(); }} className="text-gray-500 hover:text-gray-700">
               ✕
             </button>
           </div>
