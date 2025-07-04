@@ -12,7 +12,6 @@ import re
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import logging
 from threading import Lock
-import random
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -26,33 +25,29 @@ _driver_lock = Lock()
 def setup_driver():
     global _driver
     with _driver_lock:
-        if _driver is not None:
-            try:
-                _driver.quit()
-            except Exception:
-                pass
-        options = webdriver.ChromeOptions()
-        options.add_argument('--ignore-certificate-errors')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--window-size=1920,1080')
-        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36')
-        options.add_argument('--disable-cache')
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
-        service = Service()
-        _driver = webdriver.Chrome(service=service, options=options)
-        
-        _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-            'source': '''
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                })
-            '''
-        })
-        
-        logger.info("Initialized new WebDriver instance")
+        if _driver is None: 
+            options = webdriver.ChromeOptions()
+            options.add_argument('--ignore-certificate-errors')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--window-size=1920,1080')
+            options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36')
+            options.add_argument('--disable-cache')
+            options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
+            service = Service()
+            _driver = webdriver.Chrome(service=service, options=options)
+            
+            _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': '''
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    })
+                '''
+            })
+            
+            logger.info("Initialized new WebDriver instance")
         return _driver
 
 def modify_hotel_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
@@ -178,11 +173,6 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
         with open('error_page_content.html', 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
         return {"error": str(e)}
-    finally:
-        try:
-            driver.quit()
-        except:
-            pass
 
 def cleanup_driver():
     global _driver

@@ -6,7 +6,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import LoadingSpinner from './LoadingSpinner';
 import InputNumber from 'rc-input-number';
-import 'rc-input-number/assets/index.css'; // Import default styles
+import 'rc-input-number/assets/index.css';
 
 function formatDateToLocal(date) {
   if (!date) return '';
@@ -35,10 +35,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const { convertAmount, getCurrencySymbol, currentCurrency } = useContext(CurrencyContext);
   const { t } = useTranslation();
   const isFetchingRef = useRef(false);
+  const isPausedRef = useRef(false); // New ref to track pause state
   const hasInitialFetchRef = useRef(false);
 
-  const fetchPrices = useCallback(async () => {
-    if (!isOpen || !accommodation || isFetchingRef.current) return;
+  const fetchPrices = useCallback(async (forceFetch = false) => {
+    if (!isOpen || !accommodation || isFetchingRef.current || (isPausedRef.current && !forceFetch)) return;
 
     const checkInStr = formatDateToLocal(checkIn);
     const checkOutStr = formatDateToLocal(checkOut);
@@ -56,10 +57,6 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     isFetchingRef.current = true;
     setLoading(true);
     setError(null);
-    setAlternativeDates([]);
-    setDeals([]);
-    setOriginalDeals([]);
-    setOriginalAltDates([]);
 
     try {
       if (!accommodation.booking_dot_com_affiliate_url) {
@@ -88,7 +85,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       }
 
       const data = await response.json();
-      console.log('Received response:', data); 
+      console.log('Received response:', data);
 
       if (data.error) {
         if (data.alternative_dates) {
@@ -148,9 +145,14 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount]);
 
   useEffect(() => {
-    if (isOpen && !hasInitialFetchRef.current) {
-      hasInitialFetchRef.current = true;
-      fetchPrices();
+    if (isOpen) {
+      if (!hasInitialFetchRef.current || isPausedRef.current) {
+        hasInitialFetchRef.current = true;
+        isPausedRef.current = false; 
+        fetchPrices(true); 
+      }
+    } else {
+      isPausedRef.current = true; 
     }
   }, [isOpen, fetchPrices]);
 
@@ -168,6 +170,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       setAlternativeDates(reconvertAltDates);
     }
   }, [currentCurrency, convertAmount, deals, alternativeDates, originalDeals, originalAltDates]);
+
+  const handleUpdateSearch = () => {
+    isPausedRef.current = false; 
+    fetchPrices(true); 
+  };
 
   const GuestControls = () => (
     <div className="grid grid-cols-3 gap-4 mt-2">
@@ -251,7 +258,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold">{accommodation.name}</h3>
-            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <button onClick={() => { isPausedRef.current = true; onClose(); }} className="text-gray-500 hover:text-gray-700">
               ✕
             </button>
           </div>
@@ -284,7 +291,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             </div>
             <GuestControls />
             <button
-              onClick={fetchPrices}
+              onClick={handleUpdateSearch}
               disabled={loading || isFetchingRef.current}
               className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-blue-400"
             >
