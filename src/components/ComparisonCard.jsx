@@ -185,6 +185,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           downHandler={<span className="text-gray-500">-</span>}
           formatter={(value) => `${value}`}
           parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 2)}
+          disabled={loading || isFetchingRef.current}
         />
       </div>
       <div>
@@ -201,6 +202,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           downHandler={<span className="text-gray-500">-</span>}
           formatter={(value) => `${value}`}
           parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 0)}
+          disabled={loading || isFetchingRef.current}
         />
       </div>
       <div>
@@ -217,6 +219,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           downHandler={<span className="text-gray-500">-</span>}
           formatter={(value) => `${value}`}
           parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 1)}
+          disabled={loading || isFetchingRef.current}
         />
       </div>
     </div>
@@ -263,7 +266,8 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                   value={checkIn}
                   minDate={new Date()}
                   className="w-full"
-                  format="dd/MM/yyyy" 
+                  format="dd/MM/yyyy"
+                  disabled={loading || isFetchingRef.current}
                 />
               </div>
               <div>
@@ -273,7 +277,8 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                   value={checkOut}
                   minDate={checkIn}
                   className="w-full"
-                  format="dd/MM/yyyy" 
+                  format="dd/MM/yyyy"
+                  disabled={loading || isFetchingRef.current}
                 />
               </div>
             </div>
