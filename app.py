@@ -33,6 +33,8 @@ def process_request(data):
         rooms = int(data.get('rooms', 1))
         hotel_url = data.get('hotelUrl')
         
+        logger.info(f"Processing request with dates: checkIn={checkin_date}, checkOut={checkout_date}")
+        
         if not hotel_url:
             return {"error": "Hotel URL is required"}
 

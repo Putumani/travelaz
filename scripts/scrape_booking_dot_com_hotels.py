@@ -56,7 +56,6 @@ def setup_driver():
         return _driver
 
 def modify_hotel_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
-    """Modify the specific hotel URL with new dates and occupancy"""
     parsed = urlparse(original_url)
     query_params = parse_qs(parsed.query)
     
@@ -88,6 +87,21 @@ def detect_currency(page_text):
     return "ZAR"
 
 def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
+    try:
+        checkin_dt = datetime.strptime(checkin_date, '%Y-%m-%d').date()
+        checkout_dt = datetime.strptime(checkout_date, '%Y-%m-%d').date()
+        if checkin_dt >= checkout_dt:
+            logger.error("Invalid dates: check-out must be after check-in")
+            return {"error": "Check-out date must be after check-in date"}
+        if checkin_dt < datetime.now().date():
+            logger.error("Invalid dates: check-in date cannot be in the past")
+            return {"error": "Check-in date cannot be in the past"}
+    except ValueError:
+        logger.error("Invalid date format")
+        return {"error": "Invalid date format, expected YYYY-MM-DD"}
+
+    logger.info(f"Processing dates: checkIn={checkin_date}, checkOut={checkout_date}")
+
     driver = setup_driver()
     try:
         search_url = modify_hotel_url(hotel_url, checkin_date, checkout_date, adults, children, rooms)

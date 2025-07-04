@@ -6,9 +6,17 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import LoadingSpinner from './LoadingSpinner';
 
+function formatDateToLocal(date) {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [deals, setDeals] = useState([]);
-  const [originalDeals, setOriginalDeals] = useState([]); 
+  const [originalDeals, setOriginalDeals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [checkIn, setCheckIn] = useState(new Date());
@@ -21,7 +29,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [children, setChildren] = useState(0);
   const [rooms, setRooms] = useState(1);
   const [alternativeDates, setAlternativeDates] = useState([]);
-  const [originalAltDates, setOriginalAltDates] = useState([]); 
+  const [originalAltDates, setOriginalAltDates] = useState([]);
   const { convertAmount, getCurrencySymbol, currentCurrency } = useContext(CurrencyContext);
   const { t } = useTranslation();
   const isFetchingRef = useRef(false);
@@ -30,9 +38,14 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const fetchPrices = useCallback(async () => {
     if (!isOpen || !accommodation || isFetchingRef.current) return;
 
+    const checkInStr = formatDateToLocal(checkIn);
+    const checkOutStr = formatDateToLocal(checkOut);
+
+    console.log('Sending dates:', { checkIn: checkInStr, checkOut: checkOutStr });
+
     const currentParams = {
-      checkIn: checkIn.toISOString().split('T')[0],
-      checkOut: checkOut.toISOString().split('T')[0],
+      checkIn: checkInStr,
+      checkOut: checkOutStr,
       adults,
       children,
       rooms,
@@ -73,6 +86,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       }
 
       const data = await response.json();
+      console.log('Received response:', data); 
 
       if (data.error) {
         if (data.alternative_dates) {
@@ -235,6 +249,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                   value={checkIn}
                   minDate={new Date()}
                   className="w-full"
+                  format="dd/MM/yyyy" 
                 />
               </div>
               <div>
@@ -244,6 +259,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                   value={checkOut}
                   minDate={checkIn}
                   className="w-full"
+                  format="dd/MM/yyyy" 
                 />
               </div>
             </div>
