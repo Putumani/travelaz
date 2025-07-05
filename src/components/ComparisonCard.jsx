@@ -36,203 +36,199 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const { t } = useTranslation();
   const isFetchingRef = useRef(false);
   const hasInitialFetchRef = useRef(false);
-  const lastSuccessfulDataRef = useRef(null); // Store last successful scrape data
-  const lastParamsRef = useRef(null); // Store last used parameters
-  const abortControllerRef = useRef(null); // For canceling fetch requests
+  const lastSuccessfulDataRef = useRef(null); 
+  const lastParamsRef = useRef(null);
+  const abortControllerRef = useRef(null); 
 
   const fetchPrices = useCallback(async (forceFetch = false) => {
-  if (!isOpen || !accommodation || isFetchingRef.current) return;
+    if (!isOpen || !accommodation || isFetchingRef.current) return;
 
-  const checkInStr = formatDateToLocal(checkIn);
-  const checkOutStr = formatDateToLocal(checkOut);
+    const checkInStr = formatDateToLocal(checkIn);
+    const checkOutStr = formatDateToLocal(checkOut);
 
-  const currentParams = {
-    checkIn: checkInStr,
-    checkOut: checkOutStr,
-    adults,
-    children,
-    rooms,
-  };
+    const currentParams = {
+      checkIn: checkInStr,
+      checkOut: checkOutStr,
+      adults,
+      children,
+      rooms,
+    };
 
-  // Check if parameters have changed since last successful fetch
-  const paramsChanged = !lastParamsRef.current || JSON.stringify(currentParams) !== JSON.stringify(lastParamsRef.current);
+    const paramsChanged = !lastParamsRef.current || JSON.stringify(currentParams) !== JSON.stringify(lastParamsRef.current);
 
-  if (!forceFetch && !paramsChanged && lastSuccessfulDataRef.current) {
-    setDeals(lastSuccessfulDataRef.current.deals);
-    setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
-    setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
-    setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
-    setError(lastSuccessfulDataRef.current.error);
-    return;
-  }
-
-  isFetchingRef.current = true;
-  setLoading(true);
-  setError(null);
-
-  abortControllerRef.current = new AbortController();
-
-  try {
-    if (!accommodation.booking_dot_com_affiliate_url) {
-      throw new Error("No Booking.com URL available for this hotel");
+    if (!forceFetch && !paramsChanged && lastSuccessfulDataRef.current) {
+      setDeals(lastSuccessfulDataRef.current.deals);
+      setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
+      setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
+      setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
+      setError(lastSuccessfulDataRef.current.error);
+      return;
     }
 
-    const response = await fetch('http://localhost:5000/scrape-booking', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        hotelUrl: accommodation.booking_dot_com_affiliate_url,
-        checkIn: currentParams.checkIn,
-        checkOut: currentParams.checkOut,
-        adults,
-        children,
-        rooms,
-      }),
-      credentials: 'omit',
-      signal: abortControllerRef.current.signal,
-    });
+    isFetchingRef.current = true;
+    setLoading(true);
+    setError(null);
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    abortControllerRef.current = new AbortController();
 
-    const data = await response.json();
-    console.log('Received response:', data);
-
-    if (data.error) {
-      const result = {
-        deals: [],
-        originalDeals: [],
-        alternativeDates: [],
-        originalAltDates: [],
-        error: data.error,
-      };
-
-      if (data.alternative_dates && data.alternative_dates.length > 0) {
-        const convertedAltDates = await Promise.all(
-          data.alternative_dates.map(async (alt) => {
-            const totalPrice = (alt.price || 0) + (alt.taxes || 0);
-            const convertedPrice = await convertAmount(totalPrice, alt.currency || data.data?.currency || 'USD');
-            return {
-              ...alt,
-              price: parseFloat(convertedPrice),
-            };
-          })
-        );
-        const originalAlt = data.alternative_dates.map(alt => ({
-          ...alt,
-          price: (alt.price || 0) + (alt.taxes || 0),
-          currency: alt.currency || data.data?.currency || 'USD',
-        }));
-        result.alternativeDates = convertedAltDates;
-        result.originalAltDates = originalAlt;
-        result.error = data.error; // Use the exact error message from backend
+    try {
+      if (!accommodation.booking_dot_com_affiliate_url) {
+        throw new Error("No Booking.com URL available for this hotel");
       }
 
-      // Store the error state to prevent retries
-      lastSuccessfulDataRef.current = { ...result, params: currentParams };
+      const response = await fetch('http://localhost:5000/scrape-booking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          hotelUrl: accommodation.booking_dot_com_affiliate_url,
+          checkIn: currentParams.checkIn,
+          checkOut: currentParams.checkOut,
+          adults,
+          children,
+          rooms,
+        }),
+        credentials: 'omit',
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Received response:', data);
+
+      if (data.error) {
+        const result = {
+          deals: [],
+          originalDeals: [],
+          alternativeDates: [],
+          originalAltDates: [],
+          error: data.error,
+        };
+
+        if (data.alternative_dates && data.alternative_dates.length > 0) {
+          const convertedAltDates = await Promise.all(
+            data.alternative_dates.map(async (alt) => {
+              const totalPrice = (alt.price || 0) + (alt.taxes || 0);
+              const convertedPrice = await convertAmount(totalPrice, alt.currency || data.data?.currency || 'USD');
+              return {
+                ...alt,
+                price: parseFloat(convertedPrice),
+              };
+            })
+          );
+          const originalAlt = data.alternative_dates.map(alt => ({
+            ...alt,
+            price: (alt.price || 0) + (alt.taxes || 0),
+            currency: alt.currency || data.data?.currency || 'USD',
+          }));
+          result.alternativeDates = convertedAltDates;
+          result.originalAltDates = originalAlt;
+          result.error = data.error; 
+        }
+
+        lastSuccessfulDataRef.current = { ...result, params: currentParams };
+        lastParamsRef.current = currentParams;
+
+        setDeals(result.deals);
+        setOriginalDeals(result.originalDeals);
+        setAlternativeDates(result.alternativeDates);
+        setOriginalAltDates(result.originalAltDates);
+        setError(result.error);
+        setLoading(false); 
+        isFetchingRef.current = false;
+        return;
+      }
+
+      const totalPrice = (data.data.price || 0) + (data.data.taxes || 0);
+      const convertedPrice = await convertAmount(totalPrice, data.data.currency || 'USD');
+
+      const bookingDeal = {
+        site_name: 'Booking.com',
+        price: parseFloat(convertedPrice),
+        currency: currentCurrency,
+        available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
+        affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
+        roomType: data.data.room_type,
+      };
+      const originalDeal = {
+        site_name: 'Booking.com',
+        price: totalPrice,
+        currency: data.data.currency || 'USD',
+        available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
+        affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
+        roomType: data.data.room_type,
+      };
+
+      const result = {
+        deals: [bookingDeal],
+        originalDeals: [originalDeal],
+        alternativeDates: [],
+        originalAltDates: [],
+        error: null,
+        params: currentParams,
+      };
+
+      lastSuccessfulDataRef.current = result;
       lastParamsRef.current = currentParams;
 
       setDeals(result.deals);
       setOriginalDeals(result.originalDeals);
       setAlternativeDates(result.alternativeDates);
       setOriginalAltDates(result.originalAltDates);
-      setError(result.error);
-      setLoading(false); // Explicitly stop loading
+      setError(null);
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('Fetch aborted');
+        if (lastSuccessfulDataRef.current) {
+          setDeals(lastSuccessfulDataRef.current.deals);
+          setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
+          setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
+          setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
+          setError(lastSuccessfulDataRef.current.error);
+          setCheckIn(new Date(lastSuccessfulDataRef.current.params.checkIn));
+          setCheckOut(new Date(lastSuccessfulDataRef.current.params.checkOut));
+          setAdults(lastSuccessfulDataRef.current.params.adults);
+          setChildren(lastSuccessfulDataRef.current.params.children);
+          setRooms(lastSuccessfulDataRef.current.params.rooms);
+        } else {
+          setDeals([]);
+          setOriginalDeals([]);
+          setAlternativeDates([]);
+          setOriginalAltDates([]);
+          setError(null);
+        }
+      } else {
+        console.error('Fetch error:', err);
+        const errorMessage = err.message || t('scrapingFailed');
+        if (lastSuccessfulDataRef.current) {
+          setDeals(lastSuccessfulDataRef.current.deals);
+          setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
+          setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
+          setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
+          setError(errorMessage);
+        } else {
+          setError(errorMessage);
+          setDeals([]);
+          setOriginalDeals([]);
+          setAlternativeDates([]);
+          setOriginalAltDates([]);
+        }
+      }
+    } finally {
+      setLoading(false);
       isFetchingRef.current = false;
-      return;
+      abortControllerRef.current = null;
     }
+  }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount]);
 
-    const totalPrice = (data.data.price || 0) + (data.data.taxes || 0);
-    const convertedPrice = await convertAmount(totalPrice, data.data.currency || 'USD');
-
-    const bookingDeal = {
-      site_name: 'Booking.com',
-      price: parseFloat(convertedPrice),
-      currency: currentCurrency,
-      available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
-      affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
-      roomType: data.data.room_type,
-    };
-    const originalDeal = {
-      site_name: 'Booking.com',
-      price: totalPrice,
-      currency: data.data.currency || 'USD',
-      available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
-      affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
-      roomType: data.data.room_type,
-    };
-
-    const result = {
-      deals: [bookingDeal],
-      originalDeals: [originalDeal],
-      alternativeDates: [],
-      originalAltDates: [],
-      error: null,
-      params: currentParams,
-    };
-
-    lastSuccessfulDataRef.current = result;
-    lastParamsRef.current = currentParams;
-
-    setDeals(result.deals);
-    setOriginalDeals(result.originalDeals);
-    setAlternativeDates(result.alternativeDates);
-    setOriginalAltDates(result.originalAltDates);
-    setError(null);
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      console.log('Fetch aborted');
-      if (lastSuccessfulDataRef.current) {
-        setDeals(lastSuccessfulDataRef.current.deals);
-        setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
-        setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
-        setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
-        setError(lastSuccessfulDataRef.current.error);
-        setCheckIn(new Date(lastSuccessfulDataRef.current.params.checkIn));
-        setCheckOut(new Date(lastSuccessfulDataRef.current.params.checkOut));
-        setAdults(lastSuccessfulDataRef.current.params.adults);
-        setChildren(lastSuccessfulDataRef.current.params.children);
-        setRooms(lastSuccessfulDataRef.current.params.rooms);
-      } else {
-        setDeals([]);
-        setOriginalDeals([]);
-        setAlternativeDates([]);
-        setOriginalAltDates([]);
-        setError(null);
-      }
-    } else {
-      console.error('Fetch error:', err);
-      const errorMessage = err.message || t('scrapingFailed');
-      if (lastSuccessfulDataRef.current) {
-        setDeals(lastSuccessfulDataRef.current.deals);
-        setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
-        setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
-        setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
-        setError(errorMessage);
-      } else {
-        setError(errorMessage);
-        setDeals([]);
-        setOriginalDeals([]);
-        setAlternativeDates([]);
-        setOriginalAltDates([]);
-      }
-    }
-  } finally {
-    setLoading(false);
-    isFetchingRef.current = false;
-    abortControllerRef.current = null;
-  }
-}, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount]);
-
-  // Initialize parameters and data when card opens
   useEffect(() => {
     if (isOpen && !hasInitialFetchRef.current) {
       if (lastSuccessfulDataRef.current && lastParamsRef.current) {
-        // Restore last successful data and parameters on first open
         setDeals(lastSuccessfulDataRef.current.deals);
         setOriginalDeals(lastSuccessfulDataRef.current.originalDeals);
         setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
@@ -244,22 +240,18 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         setChildren(lastParamsRef.current.children);
         setRooms(lastParamsRef.current.rooms);
       } else {
-        // Trigger fetch if no successful data exists
         fetchPrices(true);
       }
-      hasInitialFetchRef.current = true; // Mark as initialized
+      hasInitialFetchRef.current = true; 
     } else if (isOpen && !lastSuccessfulDataRef.current) {
-      // Trigger fetch on reopen if no successful data exists
       fetchPrices(true);
     } else if (!isOpen) {
-      // Cancel ongoing fetch when closing
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     }
   }, [isOpen, fetchPrices]);
 
-  // Handle currency changes
   useEffect(() => {
     if ((deals.length > 0 || alternativeDates.length > 0) && originalDeals.length > 0 && originalAltDates.length >= 0) {
       const reconvertDeals = originalDeals.map(deal => ({
@@ -272,7 +264,6 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       }));
       setDeals(reconvertDeals);
       setAlternativeDates(reconvertAltDates);
-      // Update last successful data with reconverted prices
       if (lastSuccessfulDataRef.current) {
         lastSuccessfulDataRef.current = {
           ...lastSuccessfulDataRef.current,
@@ -283,9 +274,8 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     }
   }, [currentCurrency, convertAmount, deals, alternativeDates, originalDeals, originalAltDates]);
 
-  // Handle updates to search parameters
   const handleUpdateSearch = () => {
-    fetchPrices(true); // Force fetch on update
+    fetchPrices(true); 
   };
 
   const GuestControls = () => (
