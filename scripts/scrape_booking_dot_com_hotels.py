@@ -12,6 +12,7 @@ import re
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import logging
 from threading import Lock
+import random
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -81,6 +82,25 @@ def detect_currency(page_text):
         return "USD"
     return "ZAR"
 
+def generate_alternative_dates(checkin_date, checkout_date):
+    try:
+        checkin_dt = datetime.strptime(checkin_date, '%Y-%m-%d').date()
+        checkout_dt = datetime.strptime(checkout_date, '%Y-%m-%d').date()
+        alternatives = []
+        
+        # Suggest a 2-night stay if the original stay is 1 night
+        if (checkout_dt - checkin_dt).days == 1:
+            new_checkout = checkin_dt + timedelta(days=2)
+            alternatives.append({
+                "checkin_date": checkin_dt.strftime('%Y-%m-%d'),
+                "checkout_date": new_checkout.strftime('%Y-%m-%d'),
+                "nights": 2,
+                "dates": f"{checkin_dt.strftime('%b %d')} - {new_checkout.strftime('%b %d')}"
+            })
+        return alternatives
+    except ValueError:
+        return []
+
 def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
     try:
         checkin_dt = datetime.strptime(checkin_date, '%Y-%m-%d').date()
@@ -106,8 +126,12 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
         for attempt in range(max_retries):
             try:
                 driver.get(search_url)
+                # Wait for either property card or unavailability message
                 WebDriverWait(driver, 20).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-card']"))
+                    EC.any_of(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-card']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div.dc52072838.a4719dfa47.adf3e7e5ef.ddf2554a1e"))
+                    )
                 )
                 break
             except Exception as e:
@@ -119,6 +143,34 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
         with open('page_content.html', 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
         
+        # Check for unavailability message first
+        try:
+            unavailability_div = driver.find_element(By.CSS_SELECTOR, "div.dc52072838.a4719dfa47.adf3e7e5ef.ddf2554a1e")
+            unavailability_message = unavailability_div.find_element(By.CSS_SELECTOR, "p.b99b6ef58f.c8075b5e6a").text
+            logger.info(f"Unavailability message detected: {unavailability_message}")
+            
+            result = {
+                "error": unavailability_message,
+                "availability": "Not available",
+                "hotel_name": "Unknown Hotel",
+                "price": None,
+                "taxes": None,
+                "currency": "ZAR",
+                "checkin_date": checkin_date,
+                "checkout_date": checkout_date,
+                "room_type": "Standard Room",
+                "source_url": search_url
+            }
+            
+            # If the message indicates a minimum stay requirement, suggest alternative dates
+            if "2+ nights" in unavailability_message.lower():
+                result["alternative_dates"] = generate_alternative_dates(checkin_date, checkout_date)
+            
+            return result
+        except NoSuchElementException:
+            logger.info("No unavailability message found, proceeding with property card scraping")
+
+        # Proceed with normal property card scraping
         hotel_card = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-card']"))
         )
@@ -140,15 +192,9 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
             availability = "Available" if price else "Not available"
         except NoSuchElementException:
             logger.warning("Price element not found, checking for unavailability indicators")
-            unavailability_indicators = hotel_card.find_elements(By.XPATH, "//*[contains(text(), 'No availability') or contains(text(), 'Sold out')]")
-            if unavailability_indicators:
-                price = None
-                taxes = None
-                availability = "Not available"
-            else:
-                price = None
-                taxes = None
-                availability = "Unknown availability (price missing)"
+            price = None
+            taxes = None
+            availability = "Not available"
 
         result = {
             "hotel_name": hotel_name,
