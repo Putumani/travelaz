@@ -139,4 +139,4 @@ function AccommodationCard({ accommodation }) {
   );
 }
 
-export default AccommodationCard;
+export default AccommodationCard; 

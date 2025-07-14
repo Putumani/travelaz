@@ -1,5 +1,6 @@
 import { useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { CurrencyContext } from '../context/CurrencyContext';
+import { LanguageContext } from '../context/LanguageContext'; 
 import { useTranslation } from '../i18n/useTranslation';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
@@ -33,12 +34,13 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [alternativeDates, setAlternativeDates] = useState([]);
   const [originalAltDates, setOriginalAltDates] = useState([]);
   const { convertAmount, getCurrencySymbol, currentCurrency } = useContext(CurrencyContext);
+  const { language } = useContext(LanguageContext); 
   const { t } = useTranslation();
   const isFetchingRef = useRef(false);
   const hasInitialFetchRef = useRef(false);
-  const lastSuccessfulDataRef = useRef(null); 
+  const lastSuccessfulDataRef = useRef(null);
   const lastParamsRef = useRef(null);
-  const abortControllerRef = useRef(null); 
+  const abortControllerRef = useRef(null);
 
   const fetchPrices = useCallback(async (forceFetch = false) => {
     if (!isOpen || !accommodation || isFetchingRef.current) return;
@@ -128,7 +130,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           }));
           result.alternativeDates = convertedAltDates;
           result.originalAltDates = originalAlt;
-          result.error = data.error; 
+          result.error = data.error;
         }
 
         lastSuccessfulDataRef.current = { ...result, params: currentParams };
@@ -139,19 +141,21 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         setAlternativeDates(result.alternativeDates);
         setOriginalAltDates(result.originalAltDates);
         setError(result.error);
-        setLoading(false); 
+        setLoading(false);
         isFetchingRef.current = false;
         return;
       }
 
       const totalPrice = (data.data.price || 0) + (data.data.taxes || 0);
       const convertedPrice = await convertAmount(totalPrice, data.data.currency || 'USD');
+      const availabilityStatus = data.data.availability?.toLowerCase() === 'available' ? 'Available' : 'SoldOut';
 
       const bookingDeal = {
         site_name: 'Booking.com',
         price: parseFloat(convertedPrice),
         currency: currentCurrency,
-        available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
+        available: t(availabilityStatus === 'Available' ? 'Available' : 'SoldOut'),
+        availabilityStatus,
         affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
         roomType: data.data.room_type,
       };
@@ -159,7 +163,8 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         site_name: 'Booking.com',
         price: totalPrice,
         currency: data.data.currency || 'USD',
-        available: data.data.availability === 'Available' ? t('Available') : t('SoldOut'),
+        available: t(availabilityStatus === 'Available' ? 'Available' : 'SoldOut'),
+        availabilityStatus,
         affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
         roomType: data.data.room_type,
       };
@@ -236,13 +241,13 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         setError(lastSuccessfulDataRef.current.error);
         setCheckIn(new Date(lastParamsRef.current.checkIn));
         setCheckOut(new Date(lastParamsRef.current.checkOut));
-        setAdults(lastParamsRef.current.adults);
-        setChildren(lastParamsRef.current.children);
-        setRooms(lastParamsRef.current.rooms);
+        setAdults(lastSuccessfulDataRef.current.params.adults);
+        setChildren(lastSuccessfulDataRef.current.params.children);
+        setRooms(lastSuccessfulDataRef.current.params.rooms);
       } else {
         fetchPrices(true);
       }
-      hasInitialFetchRef.current = true; 
+      hasInitialFetchRef.current = true;
     } else if (isOpen && !lastSuccessfulDataRef.current) {
       fetchPrices(true);
     } else if (!isOpen) {
@@ -257,10 +262,15 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       const reconvertDeals = originalDeals.map(deal => ({
         ...deal,
         price: parseFloat(convertAmount(deal.price, deal.currency)),
+        available: t(deal.availabilityStatus === 'Available' ? 'Available' : 'SoldOut'), 
       }));
       const reconvertAltDates = originalAltDates.map(alt => ({
         ...alt,
         price: parseFloat(convertAmount(alt.price, alt.currency)),
+        from: alt.from,
+        to: alt.to,
+        nights: alt.nights,
+        dates: alt.dates,
       }));
       setDeals(reconvertDeals);
       setAlternativeDates(reconvertAltDates);
@@ -272,10 +282,10 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         };
       }
     }
-  }, [currentCurrency, convertAmount, deals, alternativeDates, originalDeals, originalAltDates]);
+  }, [currentCurrency, convertAmount, language, t, deals, alternativeDates, originalDeals, originalAltDates]);
 
   const handleUpdateSearch = () => {
-    fetchPrices(true); 
+    fetchPrices(true);
   };
 
   const GuestControls = () => (
@@ -425,7 +435,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                       </div>
                       <div>
                         <div className="font-medium">{deal.site_name}</div>
-                        <div className={`text-xs ${deal.available === t('Available') ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className={`text-xs ${deal.availabilityStatus === 'Available' ? 'text-green-600' : 'text-red-600'}`}>
                           {deal.available}
                         </div>
                         {deal.roomType && (

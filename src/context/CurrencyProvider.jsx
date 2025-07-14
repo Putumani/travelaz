@@ -25,7 +25,7 @@ export function CurrencyProvider({ children }) {
       console.error('Error fetching exchange rates:', error);
       setExchangeRates({
         USD: 1,
-        ZAR: 18.5, // Update this to a current estimate (e.g., ~0.054 USD per ZAR for 2025)
+        ZAR: 18.5,
         GBP: 0.79,
         EUR: 0.93,
         AUD: 1.52,
