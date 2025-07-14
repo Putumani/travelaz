@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { CurrencyContext } from '../context/CurrencyContext';
-import { LanguageContext } from '../context/LanguageContext'; 
+import { LanguageContext } from '../context/LanguageContext';
 import { useTranslation } from '../i18n/useTranslation';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
@@ -34,7 +34,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [alternativeDates, setAlternativeDates] = useState([]);
   const [originalAltDates, setOriginalAltDates] = useState([]);
   const { convertAmount, getCurrencySymbol, currentCurrency } = useContext(CurrencyContext);
-  const { language } = useContext(LanguageContext); 
+  const { language } = useContext(LanguageContext);
   const { t } = useTranslation();
   const isFetchingRef = useRef(false);
   const hasInitialFetchRef = useRef(false);
@@ -42,11 +42,32 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const lastParamsRef = useRef(null);
   const abortControllerRef = useRef(null);
 
+  // Ensure checkOut is always at least one day after checkIn
+  useEffect(() => {
+    const tomorrow = new Date(checkIn);
+    tomorrow.setDate(checkIn.getDate() + 1);
+    // Strip time for comparison to focus on date only
+    const checkInDate = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate());
+    const checkOutDate = new Date(checkOut.getFullYear(), checkOut.getMonth(), checkOut.getDate());
+    if (checkOutDate <= checkInDate) {
+      setCheckOut(tomorrow);
+    }
+  }, [checkIn, checkOut]);
+
   const fetchPrices = useCallback(async (forceFetch = false) => {
     if (!isOpen || !accommodation || isFetchingRef.current) return;
 
     const checkInStr = formatDateToLocal(checkIn);
     const checkOutStr = formatDateToLocal(checkOut);
+
+    // Validate that check-out is after check-in
+    const checkInDate = new Date(checkInStr);
+    const checkOutDate = new Date(checkOutStr);
+    if (checkOutDate <= checkInDate) {
+      setError(t('checkOutMustBeAfterCheckIn'));
+      setLoading(false);
+      return;
+    }
 
     const currentParams = {
       checkIn: checkInStr,
@@ -64,6 +85,15 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
       setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
       setError(lastSuccessfulDataRef.current.error);
+      const cachedCheckIn = new Date(lastSuccessfulDataRef.current.params.checkIn);
+      const cachedCheckOut = new Date(lastSuccessfulDataRef.current.params.checkOut);
+      if (cachedCheckOut > cachedCheckIn) {
+        setCheckIn(cachedCheckIn);
+        setCheckOut(cachedCheckOut);
+      }
+      setAdults(lastSuccessfulDataRef.current.params.adults);
+      setChildren(lastSuccessfulDataRef.current.params.children);
+      setRooms(lastSuccessfulDataRef.current.params.rooms);
       return;
     }
 
@@ -195,8 +225,12 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
           setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
           setError(lastSuccessfulDataRef.current.error);
-          setCheckIn(new Date(lastSuccessfulDataRef.current.params.checkIn));
-          setCheckOut(new Date(lastSuccessfulDataRef.current.params.checkOut));
+          const cachedCheckIn = new Date(lastSuccessfulDataRef.current.params.checkIn);
+          const cachedCheckOut = new Date(lastSuccessfulDataRef.current.params.checkOut);
+          if (cachedCheckOut > cachedCheckIn) {
+            setCheckIn(cachedCheckIn);
+            setCheckOut(cachedCheckOut);
+          }
           setAdults(lastSuccessfulDataRef.current.params.adults);
           setChildren(lastSuccessfulDataRef.current.params.children);
           setRooms(lastSuccessfulDataRef.current.params.rooms);
@@ -239,8 +273,12 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         setAlternativeDates(lastSuccessfulDataRef.current.alternativeDates);
         setOriginalAltDates(lastSuccessfulDataRef.current.originalAltDates);
         setError(lastSuccessfulDataRef.current.error);
-        setCheckIn(new Date(lastParamsRef.current.checkIn));
-        setCheckOut(new Date(lastParamsRef.current.checkOut));
+        const cachedCheckIn = new Date(lastSuccessfulDataRef.current.params.checkIn);
+        const cachedCheckOut = new Date(lastSuccessfulDataRef.current.params.checkOut);
+        if (cachedCheckOut > cachedCheckIn) {
+          setCheckIn(cachedCheckIn);
+          setCheckOut(cachedCheckOut);
+        }
         setAdults(lastSuccessfulDataRef.current.params.adults);
         setChildren(lastSuccessfulDataRef.current.params.children);
         setRooms(lastSuccessfulDataRef.current.params.rooms);
@@ -262,7 +300,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       const reconvertDeals = originalDeals.map(deal => ({
         ...deal,
         price: parseFloat(convertAmount(deal.price, deal.currency)),
-        available: t(deal.availabilityStatus === 'Available' ? 'Available' : 'SoldOut'), 
+        available: t(deal.availabilityStatus === 'Available' ? 'Available' : 'SoldOut'),
       }));
       const reconvertAltDates = originalAltDates.map(alt => ({
         ...alt,
@@ -285,6 +323,12 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   }, [currentCurrency, convertAmount, language, t, deals, alternativeDates, originalDeals, originalAltDates]);
 
   const handleUpdateSearch = () => {
+    const checkInDate = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate());
+    const checkOutDate = new Date(checkOut.getFullYear(), checkOut.getMonth(), checkOut.getDate());
+    if (checkOutDate <= checkInDate) {
+      setError(t('checkOutMustBeAfterCheckIn'));
+      return;
+    }
     fetchPrices(true);
   };
 
@@ -381,7 +425,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
               <div>
                 <label className="block text-sm mb-1">{t('checkIn')}</label>
                 <DatePicker
-                  onChange={setCheckIn}
+                  onChange={(date) => setCheckIn(date || new Date())}
                   value={checkIn}
                   minDate={new Date()}
                   className="w-full"
@@ -392,9 +436,9 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
               <div>
                 <label className="block text-sm mb-1">{t('checkOut')}</label>
                 <DatePicker
-                  onChange={setCheckOut}
+                  onChange={(date) => setCheckOut(date || new Date(checkIn.getTime() + 24 * 60 * 60 * 1000))}
                   value={checkOut}
-                  minDate={checkIn}
+                  minDate={new Date(checkIn.getTime() + 24 * 60 * 60 * 1000)}
                   className="w-full"
                   format="dd/MM/yyyy"
                   disabled={loading || isFetchingRef.current}

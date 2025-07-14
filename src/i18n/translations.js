@@ -40,6 +40,7 @@ const translations = {
     loadingPrice: 'Loading price...',
     priceNotAvailable: 'Price not available',
     noRating: 'N/A',
+    checkOutMustBeAfterCheckIn: 'Check-out date must be after check-in date.',
   },
   'en-GB': {
     Home: 'Home',
@@ -82,6 +83,7 @@ const translations = {
     loadingPrice: 'Loading price...',
     priceNotAvailable: 'Price not available',
     noRating: 'N/A',
+    checkOutMustBeAfterCheckIn: 'Check-out date must be after check-in date.',
   },
   fr: {
     Home: 'Accueil',
@@ -124,6 +126,7 @@ const translations = {
     loadingPrice: 'Chargement du prix...',
     priceNotAvailable: 'Prix non disponible',
     noRating: 'N/A',
+    checkOutMustBeAfterCheckIn: 'La date de départ doit être postérieure à la date d’arrivée.',
   },
   es: {
     Home: 'Inicio',
@@ -166,6 +169,7 @@ const translations = {
     loadingPrice: 'Cargando precio...',
     priceNotAvailable: 'Precio no disponible',
     noRating: 'N/A',
+    checkOutMustBeAfterCheckIn: 'La fecha de salida debe ser posterior a la fecha de entrada.',
   },
   de: {
     Home: 'Startseite',
@@ -208,6 +212,7 @@ const translations = {
     loadingPrice: 'Preis wird geladen...',
     priceNotAvailable: 'Preis nicht verfügbar',
     noRating: 'N/A',
+    checkOutMustBeAfterCheckIn: 'Das Abreisedatum muss nach dem Anreisedatum liegen.',
   },
   it: {
     Home: 'Home',
@@ -250,6 +255,7 @@ const translations = {
     loadingPrice: 'Caricamento prezzo...',
     priceNotAvailable: 'Prezzo non disponibile',
     noRating: 'N/A',
+    checkOutMustBeAfterCheckIn: 'La data di partenza deve essere successiva alla data di arrivo.',
   },
 };
 
