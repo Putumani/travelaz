@@ -42,11 +42,9 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const lastParamsRef = useRef(null);
   const abortControllerRef = useRef(null);
 
-  // Ensure checkOut is always at least one day after checkIn
   useEffect(() => {
     const tomorrow = new Date(checkIn);
     tomorrow.setDate(checkIn.getDate() + 1);
-    // Strip time for comparison to focus on date only
     const checkInDate = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate());
     const checkOutDate = new Date(checkOut.getFullYear(), checkOut.getMonth(), checkOut.getDate());
     if (checkOutDate <= checkInDate) {
@@ -60,7 +58,6 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     const checkInStr = formatDateToLocal(checkIn);
     const checkOutStr = formatDateToLocal(checkOut);
 
-    // Validate that check-out is after check-in
     const checkInDate = new Date(checkInStr);
     const checkOutDate = new Date(checkOutStr);
     if (checkOutDate <= checkInDate) {
@@ -104,107 +101,91 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     abortControllerRef.current = new AbortController();
 
     try {
-      if (!accommodation.booking_dot_com_affiliate_url) {
-        throw new Error("No Booking.com URL available for this hotel");
+      const fetchPromises = [];
+      const sources = [
+        { url: accommodation.booking_dot_com_affiliate_url, endpoint: 'scrape-booking', name: 'Booking.com' },
+        { url: accommodation.trip_dot_com_affiliate_url, endpoint: 'scrape-trip', name: 'Trip.com' }
+      ].filter(source => source.url);
+
+      for (const source of sources) {
+        fetchPromises.push(
+          fetch(`http://localhost:5000/${source.endpoint}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+              hotelUrl: source.url,
+              checkIn: currentParams.checkIn,
+              checkOut: currentParams.checkOut,
+              adults,
+              children,
+              rooms,
+            }),
+            credentials: 'omit',
+            signal: abortControllerRef.current.signal,
+          }).then(response => response.json().then(data => ({ source: source.name, data })))
+        );
       }
 
-      const response = await fetch('http://localhost:5000/scrape-booking', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          hotelUrl: accommodation.booking_dot_com_affiliate_url,
-          checkIn: currentParams.checkIn,
-          checkOut: currentParams.checkOut,
-          adults,
-          children,
-          rooms,
-        }),
-        credentials: 'omit',
-        signal: abortControllerRef.current.signal,
-      });
+      const responses = await Promise.all(fetchPromises);
+      const allDeals = [];
+      const allOriginalDeals = [];
+      const allAlternativeDates = [];
+      const allOriginalAltDates = [];
+      let fetchError = null;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Received response:', data);
-
-      if (data.error) {
-        const result = {
-          deals: [],
-          originalDeals: [],
-          alternativeDates: [],
-          originalAltDates: [],
-          error: data.error,
-        };
-
-        if (data.alternative_dates && data.alternative_dates.length > 0) {
-          const convertedAltDates = await Promise.all(
-            data.alternative_dates.map(async (alt) => {
-              const totalPrice = (alt.price || 0) + (alt.taxes || 0);
-              const convertedPrice = await convertAmount(totalPrice, alt.currency || data.data?.currency || 'USD');
-              return {
-                ...alt,
-                price: parseFloat(convertedPrice),
-              };
-            })
-          );
-          const originalAlt = data.alternative_dates.map(alt => ({
-            ...alt,
-            price: (alt.price || 0) + (alt.taxes || 0),
-            currency: alt.currency || data.data?.currency || 'USD',
-          }));
-          result.alternativeDates = convertedAltDates;
-          result.originalAltDates = originalAlt;
-          result.error = data.error;
+      for (const { source, data } of responses) {
+        if (data.error) {
+          fetchError = data.error;
+          allAlternativeDates.push(...(data.alternative_dates || []));
+          allOriginalAltDates.push(...(data.alternative_dates || []));
+          continue;
         }
 
-        lastSuccessfulDataRef.current = { ...result, params: currentParams };
-        lastParamsRef.current = currentParams;
+        const totalPrice = (data.data.price || 0) + (data.data.taxes || 0);
+        const convertedPrice = await convertAmount(totalPrice, data.data.currency || 'USD');
+        const availabilityStatus = data.data.availability?.toLowerCase() === 'available' ? 'Available' : 'SoldOut';
 
-        setDeals(result.deals);
-        setOriginalDeals(result.originalDeals);
-        setAlternativeDates(result.alternativeDates);
-        setOriginalAltDates(result.originalAltDates);
-        setError(result.error);
-        setLoading(false);
-        isFetchingRef.current = false;
-        return;
+        allDeals.push({
+          site_name: source,
+          price: parseFloat(convertedPrice),
+          currency: currentCurrency,
+          available: t(availabilityStatus === 'Available' ? 'Available' : 'SoldOut'),
+          availabilityStatus,
+          affiliate_url: data.data.source_url || (source === 'Booking.com' ? accommodation.booking_dot_com_affiliate_url : accommodation.trip_dot_com_affiliate_url),
+          roomType: data.data.room_type,
+        });
+
+        allOriginalDeals.push({
+          site_name: source,
+          price: totalPrice,
+          currency: data.data.currency || 'USD',
+          available: t(availabilityStatus === 'Available' ? 'Available' : 'SoldOut'),
+          availabilityStatus,
+          affiliate_url: data.data.source_url || (source === 'Booking.com' ? accommodation.booking_dot_com_affiliate_url : accommodation.trip_dot_com_affiliate_url),
+          roomType: data.data.room_type,
+        });
       }
 
-      const totalPrice = (data.data.price || 0) + (data.data.taxes || 0);
-      const convertedPrice = await convertAmount(totalPrice, data.data.currency || 'USD');
-      const availabilityStatus = data.data.availability?.toLowerCase() === 'available' ? 'Available' : 'SoldOut';
-
-      const bookingDeal = {
-        site_name: 'Booking.com',
-        price: parseFloat(convertedPrice),
-        currency: currentCurrency,
-        available: t(availabilityStatus === 'Available' ? 'Available' : 'SoldOut'),
-        availabilityStatus,
-        affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
-        roomType: data.data.room_type,
-      };
-      const originalDeal = {
-        site_name: 'Booking.com',
-        price: totalPrice,
-        currency: data.data.currency || 'USD',
-        available: t(availabilityStatus === 'Available' ? 'Available' : 'SoldOut'),
-        availabilityStatus,
-        affiliate_url: data.data.source_url || accommodation.booking_dot_com_affiliate_url,
-        roomType: data.data.room_type,
-      };
+      const convertedAltDates = await Promise.all(
+        allAlternativeDates.map(async (alt) => {
+          const totalPrice = (alt.price || 0) + (alt.taxes || 0);
+          const convertedPrice = await convertAmount(totalPrice, alt.currency || 'USD');
+          return {
+            ...alt,
+            price: parseFloat(convertedPrice),
+          };
+        })
+      );
 
       const result = {
-        deals: [bookingDeal],
-        originalDeals: [originalDeal],
-        alternativeDates: [],
-        originalAltDates: [],
-        error: null,
+        deals: allDeals,
+        originalDeals: allOriginalDeals,
+        alternativeDates: convertedAltDates,
+        originalAltDates: allOriginalAltDates,
+        error: fetchError,
         params: currentParams,
       };
 
@@ -215,7 +196,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       setOriginalDeals(result.originalDeals);
       setAlternativeDates(result.alternativeDates);
       setOriginalAltDates(result.originalAltDates);
-      setError(null);
+      setError(fetchError);
     } catch (err) {
       if (err.name === 'AbortError') {
         console.log('Fetch aborted');
@@ -470,7 +451,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
               </div>
             ) : deals.length > 0 ? (
               deals
-                .sort((a, b) => (a.price || 0) - (b.price || 0))
+                .sort((a, b) => (a.price || Infinity) - (b.price || Infinity))
                 .map((deal, i) => (
                   <div key={i} className="flex justify-between items-center py-3 border-b">
                     <div className="flex items-center">
@@ -490,7 +471,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                     <div className="flex items-center">
                       <span className="font-bold mr-4">
                         {getCurrencySymbol()}
-                        {deal.price.toFixed(2)}
+                        {deal.price ? deal.price.toFixed(2) : 'N/A'}
                       </span>
                       <a
                         href={deal.affiliate_url}
