@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime, timedelta
@@ -17,12 +18,12 @@ app = Flask(__name__)
 
 CORS(app, resources={
     r"/scrape-booking": {
-        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+        "origins": ["http://localhost:5173", "http://127.0.0.1:5173", "https://putumani.github.io"],
         "methods": ["POST", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     },
     r"/scrape-trip": {
-        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+        "origins": ["http://localhost:5173", "http://127.0.0.1:5173", "https://putumani.github.io"],
         "methods": ["POST", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
@@ -209,6 +210,7 @@ def handle_scrape_trip_request():
 def _build_cors_response(data, status_code=200):
     response = jsonify(data)
     response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
+    response.headers.add("Access-Control-Allow-Origin", "https://myname.github.io")
     return response, status_code
 
 def get_fallback_data(source):
@@ -222,4 +224,5 @@ def get_fallback_data(source):
     }
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)

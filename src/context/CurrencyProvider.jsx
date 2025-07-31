@@ -41,13 +41,13 @@ export function CurrencyProvider({ children }) {
       console.log(`Conversion skipped: amount=${amount}, from=${fromCurrency}, to=${currentCurrency}, rates=${JSON.stringify(exchangeRates)}`);
       return amount ? amount.toFixed(2) : '0.00';
     }
-    const usdRateFrom = 1 / exchangeRates[fromCurrency]; // Convert fromCurrency to USD
-    const usdRateTo = exchangeRates[currentCurrency];   // Convert USD to currentCurrency
+    const usdRateFrom = 1 / exchangeRates[fromCurrency];
+    const usdRateTo = exchangeRates[currentCurrency];  
     const amountInUSD = amount * usdRateFrom;
     const convertedAmount = amountInUSD * usdRateTo;
     if (isNaN(convertedAmount) || !isFinite(convertedAmount)) {
       console.error(`Invalid conversion: amount=${amount}, from=${fromCurrency}, to=${currentCurrency}, result=${convertedAmount}`);
-      return amount.toFixed(2); // Fallback to original amount
+      return amount.toFixed(2); 
     }
     console.log(`Converting ${amount} ${fromCurrency} to ${currentCurrency}: ${convertedAmount.toFixed(2)} (USD rate: ${usdRateFrom}, ${currentCurrency} rate: ${usdRateTo})`);
     return convertedAmount.toFixed(2);

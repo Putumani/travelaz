@@ -97,10 +97,40 @@ def generate_alternative_dates(checkin_date, checkout_date):
                 "checkin_date": checkin_dt.strftime('%Y-%m-%d'),
                 "checkout_date": new_checkout.strftime('%Y-%m-%d'),
                 "nights": 2,
-                "dates": f"{checkin_dt.strftime('%b %d')} - {new_checkout.strftime('%b %d')}"
+                "dates": f"{checkin_dt.strftime('%b %d')} - {new_checkout.strftime('%b %d')}",
+                "price": None,
+                "currency": "USD"
             })
         return alternatives
     except ValueError:
+        return []
+
+def parse_alternative_dates(hotel_card):
+    try:
+        soldout_section = hotel_card.find_element(By.CSS_SELECTOR, "div.soldout-recommend")
+        items = soldout_section.find_elements(By.CSS_SELECTOR, "div.recommend-item")
+        alternatives = []
+        for item in items:
+            date_text = item.find_element(By.CSS_SELECTOR, "div.date span").text
+            price_text = item.find_element(By.CSS_SELECTOR, "p.price").text
+            price = extract_price(price_text)
+            if '-' in date_text:
+                checkin_str, checkout_str = date_text.split(' - ')
+                checkin_dt = datetime.strptime(checkin_str, '%b %d').replace(year=datetime.now().year)
+                checkout_dt = datetime.strptime(checkout_str, '%b %d').replace(year=datetime.now().year)
+                if checkout_dt < checkin_dt:
+                    checkout_dt = checkout_dt.replace(year=checkout_dt.year + 1)
+                nights = (checkout_dt - checkin_dt).days
+                alternatives.append({
+                    "checkin_date": checkin_dt.strftime('%Y-%m-%d'),
+                    "checkout_date": checkout_dt.strftime('%Y-%m-%d'),
+                    "nights": nights,
+                    "dates": date_text,
+                    "price": price,
+                    "currency": "USD"
+                })
+        return alternatives
+    except NoSuchElementException:
         return []
 
 def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
@@ -173,7 +203,30 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
         distance = hotel_card.find_element(By.CSS_SELECTOR, "p.transport span:nth-child(2)").text
         availability_url = hotel_card.find_element(By.CSS_SELECTOR, "a[href*='/hotels/detail']").get_attribute("href")
         currency = detect_currency(hotel_card.text)
-        room_type = hotel_card.find_element(By.CSS_SELECTOR, "span.room-panel-roominfo-name").text
+
+        # Check for sold-out status
+        try:
+            soldout_section = hotel_card.find_element(By.CSS_SELECTOR, "div.soldout-recommend")
+            logger.info("Hotel is sold out, extracting alternative dates")
+            result = {
+                "hotel_name": hotel_name,
+                "rating": rating,
+                "reviews": reviews,
+                "location": location,
+                "distance_from_center": distance,
+                "price": None,
+                "taxes": None,
+                "currency": currency,
+                "availability": "Not available",
+                "checkin_date": checkin_date,
+                "checkout_date": checkout_date,
+                "room_type": "Standard Room",
+                "source_url": availability_url,
+                "alternative_dates": parse_alternative_dates(hotel_card)
+            }
+            return result
+        except NoSuchElementException:
+            logger.info("Hotel not sold out, proceeding with price and room type extraction")
 
         try:
             price_element = hotel_card.find_element(By.CSS_SELECTOR, "div.real.labelColor")
@@ -184,10 +237,16 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
             taxes = float(taxes_match.group(1)) - price if taxes_match else 0
             availability = "Available" if price else "Not available"
         except NoSuchElementException:
-            logger.warning("Price element not found, checking for unavailability indicators")
+            logger.warning("Price element not found, assuming not available")
             price = None
             taxes = None
             availability = "Not available"
+
+        try:
+            room_type = hotel_card.find_element(By.CSS_SELECTOR, "span.room-panel-roominfo-name").text
+        except NoSuchElementException:
+            logger.warning("Room type element not found, using default")
+            room_type = "Standard Room"
 
         result = {
             "hotel_name": hotel_name,
@@ -211,7 +270,14 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
         logger.error(f"Scraping error: {str(e)}")
         with open('trip_error_page_content.html', 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
-        return {"error": str(e)}
+        return {"error": str(e), "fallback_data": {
+            "price": None,
+            "taxes": 0,
+            "currency": "USD",
+            "availability": "Not available",
+            "room_type": "Standard Room",
+            "source": "Trip.com"
+        }, "alternative_dates": []}
 
 def cleanup_driver():
     global _driver
