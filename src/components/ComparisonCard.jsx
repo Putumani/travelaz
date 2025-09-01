@@ -9,7 +9,6 @@ const ComparisonCard = ({ accommodation, isOpen, onClose }) => {
   const { t } = useTranslation();
   const { currentCurrency, convertAmount } = useCurrency();
   const [deals, setDeals] = useState([]);
-  const [originalDeals, setOriginalDeals] = useState([]);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const abortControllerRef = useRef(null);
@@ -92,19 +91,17 @@ const ComparisonCard = ({ accommodation, isOpen, onClose }) => {
           }))
         );
         setDeals(convertedDeals);
-        setOriginalDeals(validResults.map(({ source, data }) => ({ ...data, source })));
-      } catch (err) {
+      } catch  {
         setError(t('scrapingFailed'));
       } finally {
         if (setLoading) setIsLoading(false);
       }
     },
-    [accommodation, checkIn, checkOut, currentCurrency, convertAmount, t]
+    [checkIn, checkOut, sources, convertAmount, currentCurrency, t]
   );
 
   useEffect(() => {
     if (isOpen && !hasInitialFetchRef.current) {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://travelaz-backend.onrender.com';
       const tryBackend = async () => {
         try {
           await fetchPrices(true);
@@ -131,7 +128,6 @@ const ComparisonCard = ({ accommodation, isOpen, onClose }) => {
             }))
           );
           setDeals(convertedDeals);
-          setOriginalDeals(data);
         }
       };
       tryBackend();
