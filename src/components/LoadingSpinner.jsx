@@ -1,3 +1,4 @@
+import React from 'react'
 export default function LoadingSpinner({ size = 'medium' }) {
   const sizes = {
     small: 'w-4 h-4',
