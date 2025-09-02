@@ -1,4 +1,3 @@
-# TRAVELAZ/scripts/populate_supabase.py
 from supabase import createClient
 from scrape_booking_dot_com_hotels import scrape_booking_hotel
 from scrape_trip_dot_com_hotels import scrape_trip_hotel

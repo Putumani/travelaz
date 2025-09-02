@@ -37,7 +37,7 @@ const ComparisonCard = ({ accommodation, isOpen, onClose }) => {
       abortControllerRef.current = new AbortController();
 
       const fetchPromises = [];
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://travelaz-backend.onrender.com';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://travelaz.onrender.com';
 
       for (const source of sources) {
         fetchPromises.push(
