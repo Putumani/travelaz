@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AccommodationCard from "@/components/AccommodationCard";
 import Layout from '@/components/Layout';
 import { useAccommodations } from '@/hooks/useAccommodations';

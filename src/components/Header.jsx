@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState, useContext, useEffect, useRef } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { CurrencyContext } from '../context/CurrencyContext';
 import { LanguageContext } from '../context/LanguageContext';
 import { useTranslation } from '../i18n/useTranslation';

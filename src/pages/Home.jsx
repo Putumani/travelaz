@@ -1,7 +1,7 @@
 import Hero from '@/components/Hero';
 import { Link, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import AccommodationCard from '@/components/AccommodationCard';
 import ErrorBoundary from '@/components/ErrorBoundary';
