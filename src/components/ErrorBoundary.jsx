@@ -1,4 +1,4 @@
-import React,{ Component } from 'react';
+import { Component } from 'react';
 import { useTranslation } from '../i18n/useTranslation';
 
 class ErrorBoundary extends Component {
