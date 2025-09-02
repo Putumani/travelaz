@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "homepage": "https://putumani.github.io/travelaz",
+  
   "scripts": {
-    "start": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "deploy": "vite build && gh-pages -d dist"
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview",
+      "deploy": "vite build && gh-pages -d dist"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",

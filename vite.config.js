@@ -4,9 +4,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   base: '/travelaz/', 
-  plugins: [react({
-    jsxRuntime: 'classic'
-  })],
+  plugins: [react()], 
   resolve: {
     extensions: ['.js', '.jsx', '.json'],
     alias: {
