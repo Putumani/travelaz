@@ -18,7 +18,7 @@ function Home() {
       console.log('Fetching popular hotels...');
       const { data, error } = await supabase
         .from('accommodations')
-        .select('id, name, city, price, rating, image_url, area, view_count, booking_dot_com_affiliate_url, expedia_affiliate_url, hotels_dot_com_affiliate_url, trip_dot_com_affiliate_url, priceline_affiliate_url')
+        .select('id, name, city, price, rating, image_url, area, view_count, booking_dot_com_affiliate_url, hotels_dot_com_affiliate_url, trip_dot_com_affiliate_url, priceline_affiliate_url')
         .order('view_count', { ascending: false })
         .limit(5);
 
@@ -29,7 +29,6 @@ function Home() {
       }
 
       console.log('Popular hotels data:', data);
-      // Filter out hotels with missing required fields
       const validHotels = data.filter(hotel => 
         hotel.id && hotel.name && typeof hotel.price === 'number' && hotel.rating
       );

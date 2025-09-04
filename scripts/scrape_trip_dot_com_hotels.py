@@ -204,7 +204,6 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
         availability_url = hotel_card.find_element(By.CSS_SELECTOR, "a[href*='/hotels/detail']").get_attribute("href")
         currency = detect_currency(hotel_card.text)
 
-        # Check for sold-out status
         try:
             soldout_section = hotel_card.find_element(By.CSS_SELECTOR, "div.soldout-recommend")
             logger.info("Hotel is sold out, extracting alternative dates")

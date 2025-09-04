@@ -7,7 +7,6 @@ CREATE TABLE accommodations (
   image_url TEXT,
   booking_dot_com_affiliate_url TEXT,
   trip_dot_com_affiliate_url TEXT,
-  expedia_affiliate_url TEXT,
   hotels_dot_com_affiliate_url TEXT,
   priceline_affiliate_url TEXT,
   view_count INTEGER DEFAULT 0
