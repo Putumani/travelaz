@@ -1,13 +1,13 @@
+# Use a slim Python base image
 FROM python:3.9-slim
 
-# Install system dependencies for Chrome
+# Install system dependencies for Chrome and ChromeDriver
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
     curl \
     libglib2.0-0 \
     libnss3 \
-    libgconf-2-4 \
     libfontconfig1 \
     libx11-6 \
     libx11-xcb1 \
@@ -37,18 +37,28 @@ RUN CHROMEDRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_R
     && rm /tmp/chromedriver.zip \
     && chmod +x /usr/local/bin/chromedriver
 
+# Add debugging to verify installations
+RUN google-chrome --version
+RUN chromedriver --version
+
 # Set working directory
 WORKDIR /app
 
-# Install Python dependencies
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Debug installed Python packages
+RUN pip list
 
 # Copy application code
 COPY . .
 
-# Expose port
-EXPOSE 5000
+# Expose port (Render uses 10000 by default)
+EXPOSE 10000
 
-# Run the application
+# Set environment variable for Flask
+ENV PORT=10000
+
+# Run the Flask application
 CMD ["python", "app.py"]
