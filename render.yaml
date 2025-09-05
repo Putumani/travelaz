@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: travelaz-backend
+    name: travelaz
     env: docker
     plan: free
     buildCommand: true
