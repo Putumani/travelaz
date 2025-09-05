@@ -107,9 +107,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         { url: accommodation.trip_dot_com_affiliate_url, endpoint: 'scrape-trip', name: 'Trip.com' }
       ].filter(source => source.url);
 
+      const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
+
       for (const source of sources) {
         fetchPromises.push(
-          fetch(`http://localhost:5000/${source.endpoint}`, {
+          fetch(`${API_BASE_URL}/${source.endpoint}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

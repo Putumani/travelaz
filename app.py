@@ -12,24 +12,20 @@ import sys
 from pathlib import Path
 from threading import Lock
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Add scripts directory to path
 sys.path.append(str(Path(__file__).parent / "scripts"))
 
-# Initialize Flask app
 app = Flask(__name__)
 
-# Configure CORS
 CORS(app, resources={
     r"/scrape-booking": {
         "origins": [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "https://putumani.github.io",
-            "https://travelaz-backend.onrender.com"
+            "https://travelaz.onrender.com"
         ],
         "methods": ["POST", "OPTIONS"],
         "allow_headers": ["Content-Type"]
@@ -39,21 +35,19 @@ CORS(app, resources={
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "https://putumani.github.io",
-            "https://travelaz-backend.onrender.com"
+            "https://travelaz.onrender.com"
         ],
         "methods": ["POST", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
 })
 
-# Initialize Supabase client (optional, comment out if not used)
 try:
     supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_ANON_KEY'))
 except Exception as e:
     logger.warning(f"Supabase initialization failed: {str(e)}")
     supabase = None
 
-# Thread lock for concurrent requests
 request_lock = Lock()
 
 def check_cached_deals(hotel_url, checkin_date, checkout_date, source):
@@ -92,12 +86,10 @@ def process_booking_request(data):
         if not hotel_url.startswith('https://www.booking.com'):
             return {"error": "Invalid Booking.com URL"}
 
-        # Check cache
         cached_data = check_cached_deals(hotel_url, checkin_date, checkout_date, "Booking.com")
         if cached_data:
             return cached_data
 
-        # Add random delay to avoid rate limiting
         time.sleep(random.uniform(1, 3))
 
         result = scrape_booking_hotel(
@@ -109,7 +101,6 @@ def process_booking_request(data):
             rooms=rooms
         )
 
-        # Cache result in Supabase (optional)
         if supabase and 'error' not in result:
             try:
                 supabase.table('accommodation_deals').insert({
@@ -149,12 +140,10 @@ def process_trip_request(data):
         if not hotel_url.startswith('https://www.trip.com'):
             return {"error": "Invalid Trip.com URL"}
 
-        # Check cache
         cached_data = check_cached_deals(hotel_url, checkin_date, checkout_date, "Trip.com")
         if cached_data:
             return cached_data
 
-        # Add random delay to avoid rate limiting
         time.sleep(random.uniform(1, 3))
 
         result = scrape_trip_hotel(
@@ -166,7 +155,6 @@ def process_trip_request(data):
             rooms=rooms
         )
 
-        # Cache result in Supabase (optional)
         if supabase and 'error' not in result:
             try:
                 supabase.table('accommodation_deals').insert({
@@ -305,13 +293,12 @@ def handle_scrape_trip_request():
 
 def _build_cors_response(data, status_code=200):
     response = jsonify(data)
-    # Dynamically set the allowed origin based on the request
     origin = request.headers.get('Origin', '')
     allowed_origins = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://putumani.github.io",
-        "https://travelaz-backend.onrender.com"
+        "https://travelaz.onrender.com"
     ]
     if origin in allowed_origins:
         response.headers.add("Access-Control-Allow-Origin", origin)
