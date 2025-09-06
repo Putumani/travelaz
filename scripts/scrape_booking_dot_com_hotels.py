@@ -1,13 +1,11 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from datetime import datetime, timedelta
-import json
 import time
 import os
 import re
@@ -15,9 +13,6 @@ from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import logging
 from threading import Lock
 import random
-
-app = Flask(__name__)
-CORS(app, origins=['https://putumani.github.io', 'http://localhost:3000', 'http://localhost:5173'])
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -27,9 +22,6 @@ os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
 _driver = None
 _driver_lock = Lock()
-
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service as ChromeService
 
 def setup_driver():
     global _driver
@@ -136,29 +128,6 @@ def generate_alternative_dates(checkin_date, checkout_date):
         return alternatives
     except ValueError:
         return []
-
-@app.route('/scrape-booking', methods=['POST', 'OPTIONS'])
-def scrape_booking():
-    if request.method == 'OPTIONS':
-        return '', 200
-    
-    try:
-        data = request.get_json()
-        hotel_url = data.get('hotelUrl')
-        checkin_date = data.get('checkIn')
-        checkout_date = data.get('checkOut')
-        adults = data.get('adults', 2)
-        children = data.get('children', 0)
-        rooms = data.get('rooms', 1)
-        
-        if not all([hotel_url, checkin_date, checkout_date]):
-            return jsonify({"error": "Missing required parameters"}), 400
-        
-        result = scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults, children, rooms)
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Error in scrape-booking endpoint: {str(e)}")
-        return jsonify({"error": str(e)}), 500
 
 def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
     try:
@@ -281,6 +250,3 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
 
 import atexit
 atexit.register(cleanup_driver)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)

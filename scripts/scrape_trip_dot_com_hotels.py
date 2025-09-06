@@ -1,13 +1,11 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from datetime import datetime, timedelta
-import json
 import time
 import os
 import re
@@ -15,10 +13,6 @@ from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import logging
 from threading import Lock
 import random
-
-# Initialize Flask app
-app = Flask(__name__)
-CORS(app, origins=['https://putumani.github.io', 'http://localhost:3000', 'http://localhost:5173'])
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -28,9 +22,6 @@ os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
 _driver = None
 _driver_lock = Lock()
-
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service as ChromeService
 
 def setup_driver():
     global _driver
@@ -91,17 +82,16 @@ def cleanup_driver():
 
 def modify_trip_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
     """
-    Modify Trip.com URL with the given parameters
+    Modify Trip.com URL with the given parameters (using local version with 'crn')
     """
     parsed = urlparse(original_url)
     query_params = parse_qs(parsed.query)
     
-    # Trip.com uses different parameter names than Booking.com
     query_params['checkIn'] = [checkin_date]
     query_params['checkOut'] = [checkout_date]
     query_params['adult'] = [str(adults)]
     query_params['children'] = [str(children)]
-    query_params['rooms'] = [str(rooms)]
+    query_params['crn'] = [str(rooms)]
     
     # Remove any parameters that might conflict
     for param in ['subStamp', 'subChannel', 'travelpurpose', 'curr', 'locale']:
@@ -163,32 +153,9 @@ def generate_alternative_dates(checkin_date, checkout_date):
     except ValueError:
         return []
 
-@app.route('/scrape-trip', methods=['POST', 'OPTIONS'])
-def scrape_trip():
-    if request.method == 'OPTIONS':
-        return '', 200
-    
-    try:
-        data = request.get_json()
-        hotel_url = data.get('hotelUrl')
-        checkin_date = data.get('checkIn')
-        checkout_date = data.get('checkOut')
-        adults = data.get('adults', 2)
-        children = data.get('children', 0)
-        rooms = data.get('rooms', 1)
-        
-        if not all([hotel_url, checkin_date, checkout_date]):
-            return jsonify({"error": "Missing required parameters"}), 400
-        
-        result = scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults, children, rooms)
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Error in scrape-trip endpoint: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
 def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
     """
-    Scrape hotel data from Trip.com
+    Scrape hotel data from Trip.com (integrated local logic with hosted error handling and driver)
     """
     try:
         checkin_dt = datetime.strptime(checkin_date, '%Y-%m-%d').date()
@@ -215,12 +182,15 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
         for attempt in range(max_retries):
             try:
                 driver.get(search_url)
-                # Wait for either the hotel details or an error message to load
-                WebDriverWait(driver, 20).until(
+                # Add sleep to allow full load in headless
+                time.sleep(5)
+                # Wait for one of the key elements
+                WebDriverWait(driver, 30).until(
                     EC.any_of(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, ".hotel-detail")),
-                        EC.presence_of_element_located((By.CSS_SELECTOR, ".error-container, .no-available")),
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='soldout']"))
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "section.main-container.main-content ul.long-list.long-list-v8 li[id]")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div.error-tips")),
+                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'No availability on or around your selected dates')]")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, ".soldout-tip, .no-available, [class*='soldout']"))
                     )
                 )
                 break
@@ -234,10 +204,9 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
         with open('trip_page_content.html', 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
         
-        # Check for error/sold-out messages
+        # Check for sold-out messages
         try:
-            # Check for sold-out messages
-            soldout_elements = driver.find_elements(By.CSS_SELECTOR, ".soldout-tip, .no-available, [class*='soldout']")
+            soldout_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'No availability on or around your selected dates')] | //div[contains(@class, 'soldout-tip')] | //div[contains(@class, 'no-available')] | //*[contains(@class, 'soldout')]")
             if soldout_elements:
                 soldout_message = soldout_elements[0].text
                 logger.info(f"Sold out message detected: {soldout_message}")
@@ -261,11 +230,11 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
                 
                 return result
         except NoSuchElementException:
-            logger.info("No sold-out message found, proceeding with hotel detail scraping")
+            logger.info("No sold-out message found")
         
         # Check for error messages
         try:
-            error_elements = driver.find_elements(By.CSS_SELECTOR, ".error-container, .error-tip")
+            error_elements = driver.find_elements(By.CSS_SELECTOR, "div.error-tips, .error-container, .error-tip")
             if error_elements:
                 error_message = error_elements[0].text
                 logger.info(f"Error message detected: {error_message}")
@@ -288,58 +257,54 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
                 
                 return result
         except NoSuchElementException:
-            logger.info("No error message found, proceeding with hotel detail scraping")
+            logger.info("No error message found, proceeding with hotel card scraping")
 
-        # Extract hotel details
-        hotel_name = driver.find_element(By.CSS_SELECTOR, ".hotel-name, .detail-title").text
-        rating = driver.find_element(By.CSS_SELECTOR, ".score, .review-score").text
-        reviews = driver.find_element(By.CSS_SELECTOR, ".review-count, .review-num").text
+        # Proceed with hotel card (local selectors)
+        hotel_card = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "section.main-container.main-content ul.long-list.long-list-v8 li[id]"))
+        )
+
+        hotel_name = hotel_card.find_element(By.CSS_SELECTOR, "div.list-card-title a.name").text
+        rating = hotel_card.find_element(By.CSS_SELECTOR, "div.score .real").text
+        reviews = hotel_card.find_element(By.CSS_SELECTOR, "div.count a").text
         
         # Extract location if available
-        try:
-            location = driver.find_element(By.CSS_SELECTOR, ".location, .address").text
-        except NoSuchElementException:
-            location = "Unknown"
+        location_elements = hotel_card.find_elements(By.CSS_SELECTOR, "span[data-testid='address']")
+        location = location_elements[0].text if location_elements else "Unknown"
         
         # Extract distance from center if available
-        try:
-            distance = driver.find_element(By.CSS_SELECTOR, "[class*='distance'], [class*='location']").text
-        except NoSuchElementException:
-            distance = "Unknown"
+        distance = hotel_card.find_element(By.CSS_SELECTOR, "p.transport span:nth-child(2)").text
+        
+        availability_url = hotel_card.find_element(By.CSS_SELECTOR, "a[href*='/hotels/detail']").get_attribute("href")
         
         currency = detect_currency(driver.page_source)
         
         # Try to find room type
         try:
-            room_type = driver.find_element(By.CSS_SELECTOR, ".room-name, .room-type").text
+            room_type = hotel_card.find_element(By.CSS_SELECTOR, "span.room-panel-roominfo-name").text
         except NoSuchElementException:
             room_type = "Standard Room"
         
         # Try to extract price
         try:
-            price_element = driver.find_element(By.CSS_SELECTOR, ".final-price, .total-price, .price-value")
-            price = extract_price(price_element.text)
+            price_element = hotel_card.find_element(By.CSS_SELECTOR, "div.real.labelColor")
+            price_text = price_element.text.replace("US$", "").strip()
+            price = extract_price(price_text)
             
             # Try to extract taxes
             try:
-                taxes_element = driver.find_element(By.CSS_SELECTOR, ".taxes, .fee-info, .additional-fees")
-                taxes = extract_price(taxes_element.text)
+                taxes_info = hotel_card.find_element(By.CSS_SELECTOR, "p.price-explain").text
+                taxes_match = re.search(r'Total \(incl\. taxes & fees\): US\$(\d+\.?\d*)', taxes_info)
+                taxes = float(taxes_match.group(1)) - price if taxes_match else 0
             except NoSuchElementException:
                 taxes = 0
                 
             availability = "Available" if price else "Not available"
         except NoSuchElementException:
-            logger.warning("Price element not found, checking for alternative selectors")
-            # Try alternative selectors for price
-            try:
-                price_element = driver.find_element(By.CSS_SELECTOR, "[class*='price'], [class*='amount']")
-                price = extract_price(price_element.text)
-                taxes = 0
-                availability = "Available" if price else "Not available"
-            except NoSuchElementException:
-                price = None
-                taxes = None
-                availability = "Not available"
+            logger.warning("Price element not found, checking for unavailability indicators")
+            price = None
+            taxes = None
+            availability = "Not available"
 
         result = {
             "hotel_name": hotel_name,
@@ -354,7 +319,7 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
             "checkin_date": checkin_date,
             "checkout_date": checkout_date,
             "room_type": room_type,
-            "source_url": search_url
+            "source_url": availability_url
         }
         
         logger.info(f"Scraped data from Trip.com: {result}")
@@ -372,6 +337,3 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
 
 import atexit
 atexit.register(cleanup_driver)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
