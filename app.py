@@ -78,6 +78,9 @@ def process_booking_request(data):
         rooms = int(data.get('rooms', 1))
         hotel_url = data.get('hotelUrl')
 
+        from scripts.scrape_booking_dot_com_hotels import cleanup_driver
+        cleanup_driver()
+
         logger.info(f"Processing Booking.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}")
 
         if not hotel_url:

@@ -32,42 +32,61 @@ def setup_driver():
         if _driver is None: 
             options = webdriver.ChromeOptions()
             
-            # For development - show browser window
-            # For production, set HEADLESS=true environment variable
-            if os.environ.get('HEADLESS', 'false').lower() == 'true':
-                options.add_argument('--headless=new')
+            # Always use headless in production
+            options.add_argument('--headless=new')
             
+            # Memory and performance optimizations
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-gpu')
-            options.add_argument('--window-size=1920,1080')
+            options.add_argument('--window-size=1280,1024')  # Smaller window size
             options.add_argument('--disable-setuid-sandbox')
             options.add_argument('--ignore-certificate-errors')
+            
+            # Reduce memory usage
+            options.add_argument('--disable-extensions')
+            options.add_argument('--disable-software-rasterizer')
+            options.add_argument('--disable-background-timer-throttling')
+            options.add_argument('--disable-backgrounding-occluded-windows')
+            options.add_argument('--disable-renderer-backgrounding')
+            options.add_argument('--disable-features=VizDisplayCompositor')
+            
+            # Use a unique user data directory to avoid conflicts
+            import tempfile
+            user_data_dir = tempfile.mkdtemp()
+            options.add_argument(f'--user-data-dir={user_data_dir}')
+            
+            # Security and automation detection avoidance
             options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36')
             options.add_argument('--disable-blink-features=AutomationControlled')
             options.add_experimental_option("excludeSwitches", ["enable-automation"])
             options.add_experimental_option('useAutomationExtension', False)
             
-            # For container environments
+            # Set memory limits
+            options.add_argument('--memory-pressure-off')
             options.add_argument('--disable-dev-shm-usage')
             
-            # Add these for visible browser in container
-            options.add_argument('--disable-web-security')
-            options.add_argument('--allow-running-insecure-content')
-            
-            # Use webdriver-manager to handle ChromeDriver
-            service = ChromeService(ChromeDriverManager().install())
-            _driver = webdriver.Chrome(service=service, options=options)
-            
-            _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                'source': '''
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    })
-                '''
-            })
-            
-            logger.info("Initialized new WebDriver instance")
+            try:
+                service = Service()
+                _driver = webdriver.Chrome(service=service, options=options)
+                
+                _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                    'source': '''
+                        Object.defineProperty(navigator, 'webdriver', {
+                            get: () => undefined
+                        })
+                    '''
+                })
+                
+                logger.info("Initialized new WebDriver instance")
+            except Exception as e:
+                logger.error(f"Failed to initialize WebDriver: {str(e)}")
+                import shutil
+                try:
+                    shutil.rmtree(user_data_dir)
+                except:
+                    pass
+                raise
         return _driver
 
 def modify_hotel_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):

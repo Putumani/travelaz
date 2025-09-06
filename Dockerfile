@@ -22,7 +22,6 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     fonts-liberation \
     xvfb \
-    xauth \
     && rm -rf /var/lib/apt/lists/*
 
 # Download and install Chrome manually
@@ -42,20 +41,20 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Debug installed Python packages
-RUN pip list
-
 # Copy application code
 COPY . .
 
 # Expose port (Render uses 10000 by default)
 EXPOSE 10000
 
-# Set environment variable for Flask
+# Set environment variables
 ENV PORT=10000
 ENV DISPLAY=:99
-ENV HEADLESS=false  
+ENV HEADLESS=true  
+ENV PYTHONUNBUFFERED=1
 
-# Run the Flask application with Xvfb for GUI support
-CMD Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset & \
-    python app.py
+# Use a startup script to manage Xvfb and application
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
