@@ -16,7 +16,6 @@ import logging
 from threading import Lock
 import random
 
-# Initialize Flask app
 app = Flask(__name__)
 CORS(app, origins=['https://putumani.github.io', 'http://localhost:3000', 'http://localhost:5173'])
 

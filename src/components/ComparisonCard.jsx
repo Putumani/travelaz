@@ -134,7 +134,13 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             }
             return response.json();
           })
-          .then(data => ({ source: source.name, data }))
+          .then(data => {
+            if (data.success) {
+              return { source: source.name, data: data.data };
+            } else {
+              return { source: source.name, data: { error: data.error, alternative_dates: data.alternative_dates } };
+            }
+          })
           .catch(error => {
             console.error(`Error fetching from ${source.endpoint}:`, error);
             return { source: source.name, data: { error: error.message } };

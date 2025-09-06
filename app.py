@@ -214,19 +214,7 @@ def handle_scrape_booking_request():
 
         return _build_cors_response({
             "success": True,
-            "data": {
-                "hotel_name": result.get('hotel_name', 'Unknown Hotel'),
-                "price": result.get('price', None),
-                "taxes": result.get('taxes', 0),
-                "currency": result.get('currency', 'ZAR'),
-                "check_in": result.get('checkin_date', data.get('checkIn')),
-                "check_out": result.get('checkout_date', data.get('checkOut')),
-                "occupants": int(data.get('adults', 2)) + int(data.get('children', 0)),
-                "availability": result.get('availability', 'Not available'),
-                "room_type": result.get('room_type', 'Standard Room'),
-                "source": "Booking.com",
-                "source_url": result.get('source_url', data['hotelUrl'])
-            }
+            "data": result  # Return the result directly as it contains all needed fields
         })
 
     except Exception as e:
@@ -271,19 +259,7 @@ def handle_scrape_trip_request():
 
         return _build_cors_response({
             "success": True,
-            "data": {
-                "hotel_name": result.get('hotel_name', 'Unknown Hotel'),
-                "price": result.get('price', None),
-                "taxes": result.get('taxes', 0),
-                "currency": result.get('currency', 'USD'),
-                "check_in": result.get('checkin_date', data.get('checkIn')),
-                "check_out": result.get('checkout_date', data.get('checkOut')),
-                "occupants": int(data.get('adults', 2)) + int(data.get('children', 0)),
-                "availability": result.get('availability', 'Not available'),
-                "room_type": result.get('room_type', 'Standard Room'),
-                "source": "Trip.com",
-                "source_url": result.get('source_url', data['hotelUrl'])
-            }
+            "data": result  # Return the result directly as it contains all needed fields
         })
 
     except Exception as e:
