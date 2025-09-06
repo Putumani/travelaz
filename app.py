@@ -71,6 +71,7 @@ def check_cached_deals(hotel_url, checkin_date, checkout_date, source):
         return None
 
 def process_booking_request(data):
+    from scripts.scrape_booking_dot_com_hotels import scrape_booking_hotel
     try:
         checkin_date = data.get('checkIn', datetime.now().strftime('%Y-%m-%d'))
         checkout_date = data.get('checkOut', (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'))
@@ -143,12 +144,31 @@ def process_booking_request(data):
 
 def process_trip_request(data):
     try:
+        from scripts.scrape_trip_dot_com_hotels import scrape_trip_hotel 
+
         checkin_date = data.get('checkIn', datetime.now().strftime('%Y-%m-%d'))
         checkout_date = data.get('checkOut', (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'))
         adults = int(data.get('adults', 2))
         children = int(data.get('children', 0))
         rooms = int(data.get('rooms', 1))
         hotel_url = data.get('hotelUrl')
+
+        from scripts.scrape_trip_dot_com_hotels import setup_driver_singleton, cleanup_driver_singleton
+        driver = setup_driver_singleton()
+        
+        try:
+            result = scrape_booking_hotel(
+                hotel_url=hotel_url,
+                checkin_date=checkin_date,
+                checkout_date=checkout_date,
+                adults=adults,
+                children=children,
+                rooms=rooms,
+                driver=driver  # Pass the existing driver
+            )
+        finally:
+            # Clean up tabs but keep browser instance
+            cleanup_driver_singleton()
 
         logger.info(f"Processing Trip.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}")
 
