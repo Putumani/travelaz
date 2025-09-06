@@ -22,12 +22,13 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     libasound2 \
     fonts-liberation \
+    xvfb \
+    xauth \
     && rm -rf /var/lib/apt/lists/*
 
 # Add Google Chrome repository and install Chrome
-RUN apt-get update && apt-get install -y wget gnupg \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome-keyring.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
@@ -61,6 +62,9 @@ EXPOSE 10000
 
 # Set environment variable for Flask
 ENV PORT=10000
+ENV DISPLAY=:99
+ENV HEADLESS=false  
 
-# Run the Flask application
-CMD ["python", "app.py"]
+# Run the Flask application with Xvfb for GUI support
+CMD Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset & \
+    python app.py
