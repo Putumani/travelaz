@@ -1,331 +1,313 @@
-# Updated app.py - added preferred_currency handling
-import os
-import time
-import random
-import logging
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from datetime import datetime, timedelta
-from supabase import create_client
-import atexit
-import sys
-from pathlib import Path
+import time
+import os
+import re
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+import logging
 from threading import Lock
+import random
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-sys.path.append(str(Path(__file__).parent / "scripts"))
+SCREENSHOTS_DIR = "screenshots"
+os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
-app = Flask(__name__)
+_driver = None
+_driver_lock = Lock()
 
-CORS(app, resources={
-    r"/scrape-booking": {
-        "origins": [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "https://putumani.github.io",
-            "https://travelaz.onrender.com"
-        ],
-        "methods": ["POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
-    },
-    r"/scrape-trip": {
-        "origins": [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "https://putumani.github.io",
-            "https://travelaz.onrender.com"
-        ],
-        "methods": ["POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
-    }
-})
+def setup_driver():
+    global _driver
+    with _driver_lock:
+        if _driver is None: 
+            options = webdriver.ChromeOptions()
+            options.add_argument('--headless=new')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--window-size=1280,1024')
+            options.add_argument('--disable-setuid-sandbox')
+            options.add_argument('--ignore-certificate-errors')
+            options.add_argument('--disable-extensions')
+            options.add_argument('--disable-software-rasterizer')
+            options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36')
+            options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
+            
+            try:
+                service = ChromeService(ChromeDriverManager().install())
+                _driver = webdriver.Chrome(service=service, options=options)
+                _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                    'source': '''
+                        Object.defineProperty(navigator, 'webdriver', {
+                            get: () => undefined
+                        })
+                    '''
+                })
+                logger.info("Initialized WebDriver instance")
+            except Exception as e:
+                logger.error(f"Failed to initialize WebDriver: {str(e)}")
+                raise
+        return _driver
 
-try:
-    supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_ANON_KEY'))
-except Exception as e:
-    logger.warning(f"Supabase initialization failed: {str(e)}")
-    supabase = None
+def cleanup_driver():
+    global _driver
+    with _driver_lock:
+        if _driver is not None:
+            try:
+                _driver.quit()
+                _driver = None
+                logger.info("WebDriver instance closed")
+            except Exception as e:
+                logger.error(f"Error during driver cleanup: {str(e)}")
 
-request_lock = Lock()
+def modify_hotel_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1, preferred_currency='ZAR'):
+    parsed = urlparse(original_url)
+    query_params = parse_qs(parsed.query)
+    
+    query_params['checkin'] = [checkin_date]
+    query_params['checkout'] = [checkout_date]
+    query_params['group_adults'] = [str(adults)]
+    query_params['group_children'] = [str(children)]
+    query_params['no_rooms'] = [str(rooms)]
+    query_params['selected_currency'] = [preferred_currency.upper()]
+    
+    for param in ['changed_currency', 'hlrd', 'req_adults', 'req_children', 'req_room']:
+        if param in query_params:
+            del query_params[param]
+    
+    new_query = urlencode(query_params, doseq=True)
+    logger.info(f"Modified hotel URL with preferred_currency={preferred_currency}: {new_query}")
+    return urlunparse(parsed._replace(query=new_query))
 
-def check_cached_deals(hotel_url, checkin_date, checkout_date, source):
-    """Check Supabase for cached deals to avoid redundant scraping."""
-    if not supabase:
+def extract_price(price_text):
+    if not price_text:
         return None
+    cleaned_text = re.sub(r'[^\d.]', '', price_text)
     try:
-        response = supabase.table('accommodation_deals').select('*')\
-            .eq('source_url', hotel_url)\
-            .eq('check_in', checkin_date)\
-            .eq('check_out', checkout_date)\
-            .eq('source', source)\
-            .execute()
-        if response.data:
-            logger.info(f"Retrieved cached data for {source}: {hotel_url}")
-            return response.data[0]
-        return None
-    except Exception as e:
-        logger.error(f"Error checking cached deals for {source}: {str(e)}")
+        return float(cleaned_text)
+    except ValueError:
+        logger.warning(f"Failed to parse price: {price_text}")
         return None
 
-def process_booking_request(data):
+def detect_currency(price_text, preferred_currency):
+    # Use preferred_currency if specified and valid
+    valid_currencies = ['ZAR', 'USD', 'EUR', 'GBP']
+    if preferred_currency.upper() in valid_currencies:
+        return preferred_currency.upper()
+    
+    # Fallback to detecting currency from price text
+    if price_text:
+        if '€' in price_text:
+            return 'EUR'
+        elif '£' in price_text:
+            return 'GBP'
+        elif 'ZAR' in price_text or 'R' in price_text:
+            return 'ZAR'
+        elif '$' in price_text:
+            return 'USD'
+    
+    # Default to ZAR if no currency detected
+    logger.warning(f"No currency detected in price text: {price_text}. Defaulting to ZAR.")
+    return 'ZAR'
+
+def generate_alternative_dates(checkin_date, checkout_date):
     try:
-        from scripts.scrape_booking_dot_com_hotels import scrape_booking_hotel
+        checkin_dt = datetime.strptime(checkin_date, '%Y-%m-%d').date()
+        checkout_dt = datetime.strptime(checkout_date, '%Y-%m-%d').date()
+        alternatives = []
         
-        checkin_date = data.get('checkIn', datetime.now().strftime('%Y-%m-%d'))
-        checkout_date = data.get('checkOut', (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'))
-        adults = int(data.get('adults', 2))
-        children = int(data.get('children', 0))
-        rooms = int(data.get('rooms', 1))
-        hotel_url = data.get('hotelUrl')
-        preferred_currency = data.get('preferred_currency', 'ZAR').upper()
-
-        logger.info(f"Processing Booking.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}, preferred_currency={preferred_currency}")
-
-        if not hotel_url:
-            return {"error": "Hotel URL is required"}
-
-        if not hotel_url.startswith('https://www.booking.com'):
-            return {"error": "Invalid Booking.com URL"}
-
-        cached_data = check_cached_deals(hotel_url, checkin_date, checkout_date, "Booking.com")
-        if cached_data:
-            return cached_data
-
-        time.sleep(random.uniform(1, 3))
-
-        result = scrape_booking_hotel(
-            hotel_url=hotel_url,
-            checkin_date=checkin_date,
-            checkout_date=checkout_date,
-            adults=adults,
-            children=children,
-            rooms=rooms,
-            preferred_currency=preferred_currency
-        )
-
-        if supabase and 'error' not in result:
-            try:
-                supabase.table('accommodation_deals').insert({
-                    "hotel_id": result.get('hotel_id', 0),
-                    "source": "Booking.com",
-                    "source_url": hotel_url,
-                    "price": result.get('price', 0),
-                    "taxes": result.get('taxes', 0),
-                    "currency": result.get('currency', 'ZAR'),
-                    "check_in": checkin_date,
-                    "check_out": checkout_date,
-                    "availability": result.get('availability', 'Not available'),
-                    "room_type": result.get('room_type', 'Standard Room')
-                }).execute()
-            except Exception as e:
-                logger.error(f"Failed to cache Booking.com result: {str(e)}")
-
-        return result
-    except Exception as e:
-        logger.error(f"Error processing Booking.com request: {str(e)}")
-        return {"error": str(e)}
-
-def process_trip_request(data):
-    try:
-        from scripts.scrape_trip_dot_com_hotels import scrape_trip_hotel 
-
-        checkin_date = data.get('checkIn', datetime.now().strftime('%Y-%m-%d'))
-        checkout_date = data.get('checkOut', (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'))
-        adults = int(data.get('adults', 2))
-        children = int(data.get('children', 0))
-        rooms = int(data.get('rooms', 1))
-        hotel_url = data.get('hotelUrl')
-        preferred_currency = data.get('preferred_currency', 'USD').upper()
-
-        logger.info(f"Processing Trip.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}, preferred_currency={preferred_currency}")
-
-        if not hotel_url:
-            return {"error": "Hotel URL is required"}
-
-        if not hotel_url.startswith('https://www.trip.com'):
-            return {"error": "Invalid Trip.com URL"}
-
-        cached_data = check_cached_deals(hotel_url, checkin_date, checkout_date, "Trip.com")
-        if cached_data:
-            return cached_data
-
-        time.sleep(random.uniform(1, 3))
-
-        result = scrape_trip_hotel(
-            hotel_url=hotel_url,
-            checkin_date=checkin_date,
-            checkout_date=checkout_date,
-            adults=adults,
-            children=children,
-            rooms=rooms,
-            preferred_currency=preferred_currency
-        )
-
-        if supabase and 'error' not in result:
-            try:
-                supabase.table('accommodation_deals').insert({
-                    "hotel_id": result.get('hotel_id', 0),
-                    "source": "Trip.com",
-                    "source_url": hotel_url,
-                    "price": result.get('price', 0),
-                    "taxes": result.get('taxes', 0),
-                    "currency": result.get('currency', 'USD'),
-                    "check_in": checkin_date,
-                    "check_out": checkout_date,
-                    "availability": result.get('availability', 'Not available'),
-                    "room_type": result.get('room_type', 'Standard Room')
-                }).execute()
-            except Exception as e:
-                logger.error(f"Failed to cache Trip.com result: {str(e)}")
-
-        return result
-    except Exception as e:
-        logger.error(f"Error processing Trip.com request: {str(e)}")
-        return {"error": str(e)}
-
-@app.route('/scrape-booking', methods=['POST', 'OPTIONS'])
-def handle_scrape_booking_request():
-    if request.method == 'OPTIONS':
-        response = jsonify({'status': 'preflight'})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        response.headers.add('Access-Control-Allow-Methods', 'POST')
-        return response
-
-    try:
-        data = request.get_json()
-
-        if not data or 'hotelUrl' not in data:
-            logger.warning("Missing required field: hotelUrl")
-            return _build_cors_response({
-                "success": False,
-                "error": "Missing required field: hotelUrl",
-                "fallback_data": get_fallback_data("Booking.com")
-            }, 400)
-
-        with request_lock:
-            result = process_booking_request(data)
-
-        if 'error' in result:
-            logger.error(f"Booking.com scraping error: {result['error']}")
-            return _build_cors_response({
-                "success": False,
-                "error": result['error'],
-                "fallback_data": get_fallback_data("Booking.com"),
-                "alternative_dates": result.get('alternative_dates', [])
+        if (checkout_dt - checkin_dt).days == 1:
+            new_checkout = checkin_dt + timedelta(days=2)
+            alternatives.append({
+                "checkin_date": checkin_dt.strftime('%Y-%m-%d'),
+                "checkout_date": new_checkout.strftime('%Y-%m-%d'),
+                "nights": 2,
+                "dates": f"{checkin_dt.strftime('%b %d')} - {new_checkout.strftime('%b %d')}"
             })
+        return alternatives
+    except ValueError:
+        return []
 
-        return _build_cors_response({
-            "success": True,
-            "data": {
-                "hotel_name": result.get('hotel_name', 'Unknown Hotel'),
-                "price": result.get('price', None),
-                "taxes": result.get('taxes', 0),
-                "currency": result.get('currency', 'ZAR'),
-                "check_in": result.get('checkin_date', data.get('checkIn')),
-                "check_out": result.get('checkout_date', data.get('checkOut')),
-                "occupants": int(data.get('adults', 2)) + int(data.get('children', 0)),
-                "availability": result.get('availability', 'Not available'),
-                "room_type": result.get('room_type', 'Standard Room'),
-                "source": "Booking.com",
-                "source_url": result.get('source_url', data['hotelUrl'])
-            }
-        })
-
-    except Exception as e:
-        logger.error(f"Unexpected error in booking route: {str(e)}")
-        return _build_cors_response({
-            "success": False,
-            "error": f"An unexpected error occurred: {str(e)}",
-            "fallback_data": get_fallback_data("Booking.com")
-        }, 500)
-
-@app.route('/scrape-trip', methods=['POST', 'OPTIONS'])
-def handle_scrape_trip_request():
-    if request.method == 'OPTIONS':
-        response = jsonify({'status': 'preflight'})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        response.headers.add('Access-Control-Allow-Methods', 'POST')
-        return response
-
+def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1, preferred_currency='ZAR'):
     try:
-        data = request.get_json()
+        checkin_dt = datetime.strptime(checkin_date, '%Y-%m-%d').date()
+        checkout_dt = datetime.strptime(checkout_date, '%Y-%m-%d').date()
+        if checkin_dt >= checkout_dt:
+            logger.error("Invalid dates: check-out must be after check-in")
+            return {"error": "Check-out date must be after check-in date"}
+        if checkin_dt < datetime.now().date():
+            logger.error("Invalid dates: check-in date cannot be in the past")
+            return {"error": "Check-in date cannot be in the past"}
+    except ValueError:
+        logger.error("Invalid date format")
+        return {"error": "Invalid date format, expected YYYY-MM-DD"}
 
-        if not data or 'hotelUrl' not in data:
-            logger.warning("Missing required field: hotelUrl")
-            return _build_cors_response({
-                "success": False,
-                "error": "Missing required field: hotelUrl",
-                "fallback_data": get_fallback_data("Trip.com")
-            }, 400)
+    logger.info(f"Processing dates: checkIn={checkin_date}, checkOut={checkout_date}, preferred_currency={preferred_currency}")
 
-        with request_lock:
-            result = process_trip_request(data)
-
-        if 'error' in result:
-            logger.error(f"Trip.com scraping error: {result['error']}")
-            return _build_cors_response({
-                "success": False,
-                "error": result['error'],
-                "fallback_data": get_fallback_data("Trip.com"),
-                "alternative_dates": result.get('alternative_dates', [])
-            })
-
-        return _build_cors_response({
-            "success": True,
-            "data": {
-                "hotel_name": result.get('hotel_name', 'Unknown Hotel'),
-                "price": result.get('price', None),
-                "taxes": result.get('taxes', 0),
-                "currency": result.get('currency', 'USD'),
-                "check_in": result.get('checkin_date', data.get('checkIn')),
-                "check_out": result.get('checkout_date', data.get('checkOut')),
-                "occupants": int(data.get('adults', 2)) + int(data.get('children', 0)),
-                "availability": result.get('availability', 'Not available'),
-                "room_type": result.get('room_type', 'Standard Room'),
-                "source": "Trip.com",
-                "source_url": result.get('source_url', data['hotelUrl'])
+    driver = setup_driver()
+    
+    try:
+        search_url = modify_hotel_url(hotel_url, checkin_date, checkout_date, adults, children, rooms, preferred_currency)
+        logger.info(f"Loading hotel URL: {search_url}")
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                driver.get(search_url)
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)  # Allow JavaScript to render
+                WebDriverWait(driver, 15).until(
+                    EC.any_of(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-card']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div.dc52072838.a4719dfa47.adf3e7e5ef.ddf2554a1e"))
+                    )
+                )
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    logger.error(f"Failed to load page after {max_retries} attempts: {str(e)}")
+                    raise
+                logger.warning(f"Attempt {attempt + 1} failed, retrying...")
+                time.sleep(random.uniform(2, 4))
+        
+        timestamp = int(time.time())
+        with open(os.path.join(SCREENSHOTS_DIR, f'page_content_{timestamp}.html'), 'w', encoding='utf-8') as f:
+            f.write(driver.page_source)
+        
+        try:
+            unavailability_div = driver.find_element(By.CSS_SELECTOR, "div.dc52072838.a4719dfa47.adf3e7e5ef.ddf2554a1e")
+            unavailability_message = unavailability_div.find_element(By.CSS_SELECTOR, "p.b99b6ef58f.c8075b5e6a").text
+            logger.info(f"Unavailability message detected: {unavailability_message}")
+            
+            result = {
+                "error": unavailability_message,
+                "availability": "Not available",
+                "hotel_name": "Unknown Hotel",
+                "price": None,
+                "taxes": None,
+                "currency": preferred_currency,
+                "checkin_date": checkin_date,
+                "checkout_date": checkout_date,
+                "room_type": "Standard Room",
+                "source_url": search_url
             }
-        })
+            
+            if "2+ nights" in unavailability_message.lower():
+                result["alternative_dates"] = generate_alternative_dates(checkin_date, checkout_date)
+            
+            return result
+        except NoSuchElementException:
+            logger.info("No unavailability message found, proceeding with property card scraping")
+
+        hotel_card = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-card']"))
+        )
+        
+        try:
+            hotel_name = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='title']").text
+        except NoSuchElementException:
+            hotel_name = "Unknown Hotel"
+        
+        try:
+            rating = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='review-score'] .dff2e52086").text
+        except NoSuchElementException:
+            rating = "N/A"
+        
+        try:
+            reviews = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='review-score'] .fff1944c52.fb14de7f14.eaa8455879").text
+        except NoSuchElementException:
+            reviews = "0 reviews"
+        
+        try:
+            location = hotel_card.find_element(By.CSS_SELECTOR, "span[data-testid='address']").text
+        except NoSuchElementException:
+            location = "Unknown"
+        
+        try:
+            distance = hotel_card.find_element(By.CSS_SELECTOR, "span[data-testid='distance']").text
+        except NoSuchElementException:
+            distance = "Unknown"
+        
+        try:
+            availability_url = hotel_card.find_element(By.CSS_SELECTOR, "a[data-testid='availability-cta-btn']").get_attribute("href")
+        except NoSuchElementException:
+            availability_url = search_url
+        
+        try:
+            room_type = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='recommended-units'] h4").text
+        except NoSuchElementException:
+            room_type = "Standard Room"
+        
+        try:
+            price_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "span[data-testid='price-and-discounted-price'], div.fc-price span"))
+            )
+            price_text = price_element.text
+            price = extract_price(price_text)
+            logger.info(f"Extracted price: {price_text} -> {price}")
+            
+            try:
+                taxes_element = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='taxes-and-charges']"))
+                )
+                taxes_info = taxes_element.text
+                taxes = 0 if "Includes taxes and charges" in taxes_info else None
+                logger.info(f"Taxes info: {taxes_info}")
+            except (NoSuchElementException, TimeoutException) as e:
+                logger.warning(f"Taxes element not found: {str(e)}")
+                taxes = None
+            
+            currency = detect_currency(price_text, preferred_currency)
+            availability = "Available" if price else "Not available"
+        except (NoSuchElementException, TimeoutException) as e:
+            logger.warning(f"Price element not found: {str(e)}")
+            driver.save_screenshot(os.path.join(SCREENSHOTS_DIR, f'error_price_{timestamp}.png'))
+            price = None
+            taxes = None
+            currency = preferred_currency
+            availability = "Not available"
+
+        result = {
+            "hotel_name": hotel_name,
+            "rating": rating,
+            "reviews": reviews,
+            "location": location,
+            "distance_from_center": distance,
+            "price": price,
+            "taxes": taxes,
+            "currency": currency,
+            "availability": availability,
+            "checkin_date": checkin_date,
+            "checkout_date": checkout_date,
+            "room_type": room_type,
+            "source_url": availability_url
+        }
+        
+        if price is None and availability == "Not available":
+            result["alternative_dates"] = generate_alternative_dates(checkin_date, checkout_date)
+        
+        logger.info(f"Scraped data: {result}")
+        return result
 
     except Exception as e:
-        logger.error(f"Unexpected Trip.com error: {str(e)}")
-        return _build_cors_response({
-            "success": False,
-            "error": f"An unexpected error occurred: {str(e)}",
-            "fallback_data": get_fallback_data("Trip.com")
-        }, 500)
+        logger.error(f"Scraping error for URL {search_url}: {str(e)}", exc_info=True)
+        timestamp = int(time.time())
+        driver.save_screenshot(os.path.join(SCREENSHOTS_DIR, f'error_{timestamp}.png'))
+        with open(os.path.join(SCREENSHOTS_DIR, f'error_page_content_{timestamp}.html'), 'w', encoding='utf-8') as f:
+            f.write(driver.page_source)
+        return {"error": f"Scraping failed: {str(e)}"}
+    
+    finally:
+        cleanup_driver()
 
-def _build_cors_response(data, status_code=200):
-    response = jsonify(data)
-    origin = request.headers.get('Origin', '')
-    allowed_origins = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://putumani.github.io",
-        "https://travelaz.onrender.com"
-    ]
-    if origin in allowed_origins:
-        response.headers.add("Access-Control-Allow-Origin", origin)
-    else:
-        response.headers.add("Access-Control-Allow-Origin", "https://putumani.github.io")
-    response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-    response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
-    return response, status_code
-
-def get_fallback_data(source):
-    return {
-        "price": None,
-        "taxes": 0,
-        "currency": "USD" if source == "Trip.com" else "ZAR",
-        "availability": "Not available",
-        "room_type": "Standard Room",
-        "source": source
-    }
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
+import atexit
+atexit.register(cleanup_driver)
