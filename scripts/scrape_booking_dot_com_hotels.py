@@ -26,6 +26,9 @@ _driver_lock = Lock()
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
 
+import tempfile
+import uuid
+
 def setup_driver():
     global _driver
     with _driver_lock:
@@ -52,8 +55,8 @@ def setup_driver():
             options.add_argument('--disable-features=VizDisplayCompositor')
             
             # Use a unique user data directory to avoid conflicts
-            import tempfile
-            user_data_dir = tempfile.mkdtemp()
+            # Create a truly unique directory using UUID
+            user_data_dir = f"/tmp/chrome-data-{uuid.uuid4().hex}"
             options.add_argument(f'--user-data-dir={user_data_dir}')
             
             # Security and automation detection avoidance
@@ -67,8 +70,15 @@ def setup_driver():
             options.add_argument('--disable-dev-shm-usage')
             
             try:
-                service = Service()
+                # Use webdriver-manager to handle ChromeDriver
+                from webdriver_manager.chrome import ChromeDriverManager
+                from selenium.webdriver.chrome.service import Service as ChromeService
+                
+                service = ChromeService(ChromeDriverManager().install())
                 _driver = webdriver.Chrome(service=service, options=options)
+                
+                # Store the user data directory for cleanup
+                _driver.user_data_dir = user_data_dir
                 
                 _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
                     'source': '''
@@ -78,38 +88,140 @@ def setup_driver():
                     '''
                 })
                 
-                logger.info("Initialized new WebDriver instance")
+                logger.info(f"Initialized new WebDriver instance with user data dir: {user_data_dir}")
             except Exception as e:
                 logger.error(f"Failed to initialize WebDriver: {str(e)}")
+                # Clean up temp directory
                 import shutil
                 try:
-                    shutil.rmtree(user_data_dir)
+                    if os.path.exists(user_data_dir):
+                        shutil.rmtree(user_data_dir)
                 except:
                     pass
                 raise
         return _driver
     
-def cleanup_driver():
+_browser_pool = []
+_max_pool_size = 1 
+_pool_lock = Lock()
+
+def get_driver_from_pool():
+    global _browser_pool
+    with _pool_lock:
+        if _browser_pool:
+            logger.info("Reusing browser instance from pool")
+            return _browser_pool.pop()
+        else:
+            logger.info("Creating new browser instance (pool empty)")
+            return setup_driver_singleton()
+
+def return_driver_to_pool(driver):
+    global _browser_pool, _max_pool_size
+    with _pool_lock:
+        if len(_browser_pool) < _max_pool_size:
+            try:
+                # Clean up tabs but keep browser instance
+                driver.execute_script("window.open('about:blank', '_self');")
+                driver.close()
+                driver.switch_to.window(driver.window_handles[0])
+                _browser_pool.append(driver)
+                logger.info(f"Returned browser to pool. Pool size: {len(_browser_pool)}")
+            except Exception as e:
+                logger.error(f"Error cleaning browser for pool: {str(e)}")
+                try:
+                    driver.quit()
+                except:
+                    pass
+        else:
+            # Pool is full, quit the driver
+            try:
+                driver.quit()
+                logger.info("Quit browser instance (pool full)")
+            except:
+                pass
+
+def cleanup_pool():
+    global _browser_pool
+    with _pool_lock:
+        for driver in _browser_pool:
+            try:
+                driver.quit()
+            except:
+                pass
+        _browser_pool = []
+        logger.info("Cleaned up browser pool")
+
+def setup_driver_singleton():
+    options = webdriver.ChromeOptions()
+    
+    # Always use headless in production
+    options.add_argument('--headless=new')
+    
+    # Memory and performance optimizations
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--window-size=1280,1024')
+    options.add_argument('--disable-setuid-sandbox')
+    options.add_argument('--ignore-certificate-errors')
+    
+    # Reduce memory usage
+    options.add_argument('--disable-extensions')
+    options.add_argument('--disable-software-rasterizer')
+    options.add_argument('--disable-background-timer-throttling')
+    options.add_argument('--disable-backgrounding-occluded-windows')
+    options.add_argument('--disable-renderer-backgrounding')
+    
+    # Use a single user data directory but with no persistence
+    options.add_argument('--user-data-dir=/tmp/chrome-singleton')
+    options.add_argument('--incognito')  # Use incognito mode to avoid conflicts
+    
+    # Security and automation detection avoidance
+    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36')
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    
+    try:
+        # Use webdriver-manager to handle ChromeDriver
+        from webdriver_manager.chrome import ChromeDriverManager
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        
+        service = ChromeService(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        
+        driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+            'source': '''
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                })
+            '''
+        })
+        
+        logger.info("Initialized singleton WebDriver instance")
+        return driver
+    except Exception as e:
+        logger.error(f"Failed to initialize WebDriver: {str(e)}")
+        raise
+
+def cleanup_driver_singleton():
     global _driver
     with _driver_lock:
         if _driver is not None:
             try:
-                user_data_dir = None
-                for arg in _driver.capabilities['chrome']['userDataDir']:
-                    if 'user-data-dir' in arg:
-                        user_data_dir = arg.split('=')[1]
-                        break
-                
-                _driver.quit()
-                _driver = None
-                logger.info("WebDriver instance closed")
-                
-                if user_data_dir and os.path.exists(user_data_dir):
-                    import shutil
-                    shutil.rmtree(user_data_dir)
-                    logger.info(f"Cleaned up user data directory: {user_data_dir}")
+                # Just close all tabs but keep the browser open
+                _driver.execute_script("window.open('about:blank', '_self');")
+                _driver.close()  # Close current tab
+                # Switch to the first tab (about:blank)
+                _driver.switch_to.window(_driver.window_handles[0])
+                logger.info("Cleaned up tabs, keeping browser instance alive")
             except Exception as e:
                 logger.error(f"Error during driver cleanup: {str(e)}")
+                try:
+                    _driver.quit()
+                    _driver = None
+                except:
+                    pass
 
 def modify_hotel_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
     parsed = urlparse(original_url)
@@ -176,7 +288,9 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
 
     logger.info(f"Processing dates: checkIn={checkin_date}, checkOut={checkout_date}")
 
-    driver = setup_driver()
+    use_external_driver = driver is not None
+    if not use_external_driver:
+        driver = setup_driver()
     try:
         search_url = modify_hotel_url(hotel_url, checkin_date, checkout_date, adults, children, rooms)
         logger.info(f"Loading hotel URL: {search_url}")
@@ -274,6 +388,11 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
         with open('error_page_content.html', 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
         return {"error": str(e)}
+    
+    finally:
+        if not use_external_driver:
+            cleanup_driver()
+        
 
 def cleanup_driver():
     global _driver

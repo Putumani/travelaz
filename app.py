@@ -6,8 +6,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime, timedelta
 from supabase import create_client
-from scripts.scrape_booking_dot_com_hotels import scrape_booking_hotel
-from scripts.scrape_trip_dot_com_hotels import scrape_trip_hotel
+import atexit
+from scripts.scrape_booking_dot_com_hotels import cleanup_pool as cleanup_booking_pool, scrape_booking_hotel
+from scripts.scrape_trip_dot_com_hotels import cleanup_pool as cleanup_trip_pool
 import sys
 from pathlib import Path
 from threading import Lock
@@ -78,8 +79,22 @@ def process_booking_request(data):
         rooms = int(data.get('rooms', 1))
         hotel_url = data.get('hotelUrl')
 
-        from scripts.scrape_booking_dot_com_hotels import cleanup_driver
-        cleanup_driver()
+        from scripts.scrape_booking_dot_com_hotels import setup_driver_singleton, cleanup_driver_singleton
+        driver = setup_driver_singleton()
+        
+        try:
+            result = scrape_booking_hotel(
+                hotel_url=hotel_url,
+                checkin_date=checkin_date,
+                checkout_date=checkout_date,
+                adults=adults,
+                children=children,
+                rooms=rooms,
+                driver=driver  # Pass the existing driver
+            )
+        finally:
+            # Clean up tabs but keep browser instance
+            cleanup_driver_singleton()
 
         logger.info(f"Processing Booking.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}")
 
@@ -180,6 +195,13 @@ def process_trip_request(data):
         logger.error(f"Error processing Trip.com request: {str(e)}")
         return {"error": str(e)}
 
+@atexit.register
+def cleanup_on_exit():
+    logger.info("Cleaning up browser pools on application exit")
+    cleanup_booking_pool()
+    cleanup_trip_pool()
+
+# Add error handling to your routes
 @app.route('/scrape-booking', methods=['POST', 'OPTIONS'])
 def handle_scrape_booking_request():
     if request.method == 'OPTIONS':
@@ -230,7 +252,7 @@ def handle_scrape_booking_request():
         })
 
     except Exception as e:
-        logger.error(f"Unexpected Booking.com error: {str(e)}")
+        logger.error(f"Unexpected error in booking route: {str(e)}")
         return _build_cors_response({
             "success": False,
             "error": f"An unexpected error occurred: {str(e)}",
