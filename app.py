@@ -72,6 +72,7 @@ def check_cached_deals(hotel_url, checkin_date, checkout_date, source):
 
 def process_booking_request(data):
     from scripts.scrape_booking_dot_com_hotels import scrape_booking_hotel
+
     try:
         checkin_date = data.get('checkIn', datetime.now().strftime('%Y-%m-%d'))
         checkout_date = data.get('checkOut', (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'))
@@ -82,7 +83,7 @@ def process_booking_request(data):
 
         from scripts.scrape_booking_dot_com_hotels import setup_driver_singleton, cleanup_driver_singleton
         driver = setup_driver_singleton()
-        
+
         try:
             result = scrape_booking_hotel(
                 hotel_url=hotel_url,
@@ -91,10 +92,9 @@ def process_booking_request(data):
                 adults=adults,
                 children=children,
                 rooms=rooms,
-                driver=driver  # Pass the existing driver
+                driver=driver  
             )
         finally:
-            # Clean up tabs but keep browser instance
             cleanup_driver_singleton()
 
         logger.info(f"Processing Booking.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}")
@@ -111,14 +111,6 @@ def process_booking_request(data):
 
         time.sleep(random.uniform(1, 3))
 
-        result = scrape_booking_hotel(
-            hotel_url=hotel_url,
-            checkin_date=checkin_date,
-            checkout_date=checkout_date,
-            adults=adults,
-            children=children,
-            rooms=rooms
-        )
 
         if supabase and 'error' not in result:
             try:
@@ -157,17 +149,16 @@ def process_trip_request(data):
         driver = setup_driver_singleton()
         
         try:
-            result = scrape_booking_hotel(
+            result = scrape_trip_hotel(
                 hotel_url=hotel_url,
                 checkin_date=checkin_date,
                 checkout_date=checkout_date,
                 adults=adults,
                 children=children,
                 rooms=rooms,
-                driver=driver  # Pass the existing driver
+                driver=driver  
             )
         finally:
-            # Clean up tabs but keep browser instance
             cleanup_driver_singleton()
 
         logger.info(f"Processing Trip.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}")
@@ -183,15 +174,6 @@ def process_trip_request(data):
             return cached_data
 
         time.sleep(random.uniform(1, 3))
-
-        result = scrape_trip_hotel(
-            hotel_url=hotel_url,
-            checkin_date=checkin_date,
-            checkout_date=checkout_date,
-            adults=adults,
-            children=children,
-            rooms=rooms
-        )
 
         if supabase and 'error' not in result:
             try:
@@ -221,7 +203,6 @@ def cleanup_on_exit():
     cleanup_booking_pool()
     cleanup_trip_pool()
 
-# Add error handling to your routes
 @app.route('/scrape-booking', methods=['POST', 'OPTIONS'])
 def handle_scrape_booking_request():
     if request.method == 'OPTIONS':

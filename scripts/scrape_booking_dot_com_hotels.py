@@ -407,3 +407,10 @@ def cleanup_driver():
 
 import atexit
 atexit.register(cleanup_driver)
+
+import os
+def cleanup_files():
+    for file in ['page_content.html', 'trip_page_content.html', 'error_page_content.html', 'trip_error_page_content.html']:
+        if os.path.exists(file):
+            os.remove(file)
+atexit.register(cleanup_files)
