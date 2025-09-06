@@ -23,6 +23,9 @@ os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 _driver = None
 _driver_lock = Lock()
 
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service as ChromeService
+
 def setup_driver():
     global _driver
     with _driver_lock:
@@ -52,10 +55,8 @@ def setup_driver():
             options.add_argument('--disable-web-security')
             options.add_argument('--allow-running-insecure-content')
             
-            # Specify using Chromium explicitly
-            options.binary_location = '/usr/bin/chromium'
-            
-            service = Service(executable_path='/usr/local/bin/chromedriver')
+            # Use webdriver-manager to handle ChromeDriver
+            service = ChromeService(ChromeDriverManager().install())
             _driver = webdriver.Chrome(service=service, options=options)
             
             _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
