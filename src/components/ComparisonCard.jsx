@@ -107,7 +107,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         { url: accommodation.trip_dot_com_affiliate_url, endpoint: 'scrape-trip', name: 'Trip.com' }
       ].filter(source => source.url);
 
-      const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
+      const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://travelaz.onrender.com';
 
       for (const source of sources) {
         fetchPromises.push(
@@ -127,7 +127,18 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             }),
             credentials: 'omit',
             signal: abortControllerRef.current.signal,
-          }).then(response => response.json().then(data => ({ source: source.name, data })))
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+          })
+          .then(data => ({ source: source.name, data }))
+          .catch(error => {
+            console.error(`Error fetching from ${source.endpoint}:`, error);
+            return { source: source.name, data: { error: error.message } };
+          })
         );
       }
 
@@ -146,9 +157,9 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           continue;
         }
 
-        const totalPrice = (data.data.price || 0) + (data.data.taxes || 0);
-        const convertedPrice = await convertAmount(totalPrice, data.data.currency || 'USD');
-        const availabilityStatus = data.data.availability?.toLowerCase() === 'available' ? 'Available' : 'SoldOut';
+        const totalPrice = (data.price || 0) + (data.taxes || 0);
+        const convertedPrice = await convertAmount(totalPrice, data.currency || 'USD');
+        const availabilityStatus = data.availability?.toLowerCase() === 'available' ? 'Available' : 'SoldOut';
 
         allDeals.push({
           site_name: source,
@@ -156,18 +167,18 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           currency: currentCurrency,
           available: t(availabilityStatus === 'Available' ? 'Available' : 'SoldOut'),
           availabilityStatus,
-          affiliate_url: data.data.source_url || (source === 'Booking.com' ? accommodation.booking_dot_com_affiliate_url : accommodation.trip_dot_com_affiliate_url),
-          roomType: data.data.room_type,
+          affiliate_url: data.source_url || (source === 'Booking.com' ? accommodation.booking_dot_com_affiliate_url : accommodation.trip_dot_com_affiliate_url),
+          roomType: data.room_type,
         });
 
         allOriginalDeals.push({
           site_name: source,
           price: totalPrice,
-          currency: data.data.currency || 'USD',
+          currency: data.currency || 'USD',
           available: t(availabilityStatus === 'Available' ? 'Available' : 'SoldOut'),
           availabilityStatus,
-          affiliate_url: data.data.source_url || (source === 'Booking.com' ? accommodation.booking_dot_com_affiliate_url : accommodation.trip_dot_com_affiliate_url),
-          roomType: data.data.room_type,
+          affiliate_url: data.source_url || (source === 'Booking.com' ? accommodation.booking_dot_com_affiliate_url : accommodation.trip_dot_com_affiliate_url),
+          roomType: data.room_type,
         });
       }
 

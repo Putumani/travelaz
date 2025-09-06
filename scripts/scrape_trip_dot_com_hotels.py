@@ -1,3 +1,5 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -13,6 +15,10 @@ from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import logging
 from threading import Lock
 import random
+
+# Initialize Flask app
+app = Flask(__name__)
+CORS(app, origins=['https://putumani.github.io', 'http://localhost:3000', 'http://localhost:5173'])
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -156,6 +162,29 @@ def generate_alternative_dates(checkin_date, checkout_date):
         return alternatives
     except ValueError:
         return []
+
+@app.route('/scrape-trip', methods=['POST', 'OPTIONS'])
+def scrape_trip():
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    try:
+        data = request.get_json()
+        hotel_url = data.get('hotelUrl')
+        checkin_date = data.get('checkIn')
+        checkout_date = data.get('checkOut')
+        adults = data.get('adults', 2)
+        children = data.get('children', 0)
+        rooms = data.get('rooms', 1)
+        
+        if not all([hotel_url, checkin_date, checkout_date]):
+            return jsonify({"error": "Missing required parameters"}), 400
+        
+        result = scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults, children, rooms)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error in scrape-trip endpoint: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
     """
@@ -343,3 +372,6 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
 
 import atexit
 atexit.register(cleanup_driver)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001, debug=True)
