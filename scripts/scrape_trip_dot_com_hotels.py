@@ -1,3 +1,4 @@
+# Updated scripts/scrape_booking_dot_com_hotels.py - added preferred_currency param
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
@@ -28,33 +29,23 @@ def setup_driver():
     with _driver_lock:
         if _driver is None: 
             options = webdriver.ChromeOptions()
-            
-            # Always use headless in production
             options.add_argument('--headless=new')
-            
-            # Memory and performance optimizations
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-gpu')
             options.add_argument('--window-size=1280,1024')
             options.add_argument('--disable-setuid-sandbox')
             options.add_argument('--ignore-certificate-errors')
-            
-            # Reduce memory usage
             options.add_argument('--disable-extensions')
             options.add_argument('--disable-software-rasterizer')
-            
-            # Security and automation detection avoidance
             options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36')
             options.add_argument('--disable-blink-features=AutomationControlled')
             options.add_experimental_option("excludeSwitches", ["enable-automation"])
             options.add_experimental_option('useAutomationExtension', False)
             
             try:
-                # Use webdriver-manager to handle ChromeDriver
                 service = ChromeService(ChromeDriverManager().install())
                 _driver = webdriver.Chrome(service=service, options=options)
-                
                 _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
                     'source': '''
                         Object.defineProperty(navigator, 'webdriver', {
@@ -62,7 +53,6 @@ def setup_driver():
                         })
                     '''
                 })
-                
                 logger.info("Initialized WebDriver instance")
             except Exception as e:
                 logger.error(f"Failed to initialize WebDriver: {str(e)}")
@@ -80,49 +70,57 @@ def cleanup_driver():
             except Exception as e:
                 logger.error(f"Error during driver cleanup: {str(e)}")
 
-def modify_trip_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
-    """
-    Modify Trip.com URL with the given parameters (using local version with 'crn')
-    """
+def modify_hotel_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1, preferred_currency='ZAR'):
     parsed = urlparse(original_url)
     query_params = parse_qs(parsed.query)
     
-    query_params['checkIn'] = [checkin_date]
-    query_params['checkOut'] = [checkout_date]
-    query_params['adult'] = [str(adults)]
-    query_params['children'] = [str(children)]
-    query_params['crn'] = [str(rooms)]
+    query_params['checkin'] = [checkin_date]
+    query_params['checkout'] = [checkout_date]
+    query_params['group_adults'] = [str(adults)]
+    query_params['group_children'] = [str(children)]
+    query_params['no_rooms'] = [str(rooms)]
+    query_params['selected_currency'] = [preferred_currency.upper()]
     
-    # Remove any parameters that might conflict
-    for param in ['subStamp', 'subChannel', 'travelpurpose', 'curr', 'locale']:
+    for param in ['changed_currency', 'hlrd', 'req_adults', 'req_children', 'req_room']:
         if param in query_params:
             del query_params[param]
     
-    # Set currency to USD by default
-    query_params['curr'] = ['USD']
-    query_params['locale'] = ['en-US']
-    
     new_query = urlencode(query_params, doseq=True)
-    logger.info(f"Modified Trip.com URL: {new_query}")
+    logger.info(f"Modified hotel URL: {new_query}")
     return urlunparse(parsed._replace(query=new_query))
 
 def extract_price(price_text):
     if not price_text:
         return None
-    # Extract numbers from price text, handling decimals
-    numbers = re.findall(r'[\d,]+(?:\.\d+)?', price_text.replace(",", ""))
-    return float(numbers[0]) if numbers else None
+    cleaned_text = re.sub(r'[^\d.]', '', price_text)
+    try:
+        return float(cleaned_text)
+    except ValueError:
+        logger.warning(f"Failed to parse price: {price_text}")
+        return None
 
-def detect_currency(page_text):
-    if "US$" in page_text or "$" in page_text:
-        return "USD"
-    elif "ZAR" in page_text or "R" in page_text:
-        return "ZAR"
-    elif "€" in page_text or "EUR" in page_text:
-        return "EUR"
-    elif "£" in page_text or "GBP" in page_text:
-        return "GBP"
-    return "USD"  # Default to USD
+def detect_currency(price_text, page_text):
+    # Prioritize currency from price text
+    if price_text:
+        if '$' in price_text:
+            return 'USD'
+        elif '€' in price_text:
+            return 'EUR'
+        elif '£' in price_text:
+            return 'GBP'
+        elif 'ZAR' in price_text or 'R' in price_text:
+            return 'ZAR'
+    
+    # Fallback to page text
+    if 'ZAR' in page_text or 'R' in page_text:
+        return 'ZAR'
+    elif '$' in page_text:
+        return 'USD'
+    elif '€' in page_text:
+        return 'EUR'
+    elif '£' in page_text:
+        return 'GBP'
+    return 'ZAR'  # Default
 
 def generate_alternative_dates(checkin_date, checkout_date):
     try:
@@ -130,7 +128,6 @@ def generate_alternative_dates(checkin_date, checkout_date):
         checkout_dt = datetime.strptime(checkout_date, '%Y-%m-%d').date()
         alternatives = []
         
-        # Generate alternative dates with 2-night stay if originally 1 night
         if (checkout_dt - checkin_dt).days == 1:
             new_checkout = checkin_dt + timedelta(days=2)
             alternatives.append({
@@ -139,24 +136,11 @@ def generate_alternative_dates(checkin_date, checkout_date):
                 "nights": 2,
                 "dates": f"{checkin_dt.strftime('%b %d')} - {new_checkout.strftime('%b %d')}"
             })
-        
-        # Generate alternative dates with 3-night stay
-        new_checkout_3 = checkin_dt + timedelta(days=3)
-        alternatives.append({
-            "checkin_date": checkin_dt.strftime('%Y-%m-%d'),
-            "checkout_date": new_checkout_3.strftime('%Y-%m-%d'),
-            "nights": 3,
-            "dates": f"{checkin_dt.strftime('%b %d')} - {new_checkout_3.strftime('%b %d')}"
-        })
-        
         return alternatives
     except ValueError:
         return []
 
-def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
-    """
-    Scrape hotel data from Trip.com (integrated local logic with hosted error handling and driver)
-    """
+def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1, preferred_currency='ZAR'):
     try:
         checkin_dt = datetime.strptime(checkin_date, '%Y-%m-%d').date()
         checkout_dt = datetime.strptime(checkout_date, '%Y-%m-%d').date()
@@ -175,135 +159,124 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
     driver = setup_driver()
     
     try:
-        search_url = modify_trip_url(hotel_url, checkin_date, checkout_date, adults, children, rooms)
-        logger.info(f"Loading Trip.com URL: {search_url}")
+        search_url = modify_hotel_url(hotel_url, checkin_date, checkout_date, adults, children, rooms, preferred_currency)
+        logger.info(f"Loading hotel URL: {search_url}")
         
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 driver.get(search_url)
-                # Add sleep to allow full load in headless
-                time.sleep(5)
-                # Wait for one of the key elements
-                WebDriverWait(driver, 30).until(
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)  # Allow JavaScript to render
+                WebDriverWait(driver, 15).until(
                     EC.any_of(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "section.main-container.main-content ul.long-list.long-list-v8 li[id]")),
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "div.error-tips")),
-                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'No availability on or around your selected dates')]")),
-                        EC.presence_of_element_located((By.CSS_SELECTOR, ".soldout-tip, .no-available, [class*='soldout']"))
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-card']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div.dc52072838.a4719dfa47.adf3e7e5ef.ddf2554a1e"))
                     )
                 )
                 break
             except Exception as e:
                 if attempt == max_retries - 1:
+                    logger.error(f"Failed to load page after {max_retries} attempts: {str(e)}")
                     raise
                 logger.warning(f"Attempt {attempt + 1} failed, retrying...")
                 time.sleep(random.uniform(2, 4))
         
-        # Save page content for debugging
-        with open('trip_page_content.html', 'w', encoding='utf-8') as f:
+        timestamp = int(time.time())
+        with open(os.path.join(SCREENSHOTS_DIR, f'page_content_{timestamp}.html'), 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
         
-        # Check for sold-out messages
         try:
-            soldout_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'No availability on or around your selected dates')] | //div[contains(@class, 'soldout-tip')] | //div[contains(@class, 'no-available')] | //*[contains(@class, 'soldout')]")
-            if soldout_elements:
-                soldout_message = soldout_elements[0].text
-                logger.info(f"Sold out message detected: {soldout_message}")
-                
-                result = {
-                    "error": soldout_message,
-                    "availability": "Not available",
-                    "hotel_name": "Unknown Hotel",
-                    "price": None,
-                    "taxes": None,
-                    "currency": "USD",
-                    "checkin_date": checkin_date,
-                    "checkout_date": checkout_date,
-                    "room_type": "Standard Room",
-                    "source_url": search_url
-                }
-                
-                # Check if it's a minimum stay requirement
-                if "minimum" in soldout_message.lower() or "night" in soldout_message.lower():
-                    result["alternative_dates"] = generate_alternative_dates(checkin_date, checkout_date)
-                
-                return result
+            unavailability_div = driver.find_element(By.CSS_SELECTOR, "div.dc52072838.a4719dfa47.adf3e7e5ef.ddf2554a1e")
+            unavailability_message = unavailability_div.find_element(By.CSS_SELECTOR, "p.b99b6ef58f.c8075b5e6a").text
+            logger.info(f"Unavailability message detected: {unavailability_message}")
+            
+            result = {
+                "error": unavailability_message,
+                "availability": "Not available",
+                "hotel_name": "Unknown Hotel",
+                "price": None,
+                "taxes": None,
+                "currency": preferred_currency,
+                "checkin_date": checkin_date,
+                "checkout_date": checkout_date,
+                "room_type": "Standard Room",
+                "source_url": search_url
+            }
+            
+            if "2+ nights" in unavailability_message.lower():
+                result["alternative_dates"] = generate_alternative_dates(checkin_date, checkout_date)
+            
+            return result
         except NoSuchElementException:
-            logger.info("No sold-out message found")
-        
-        # Check for error messages
-        try:
-            error_elements = driver.find_elements(By.CSS_SELECTOR, "div.error-tips, .error-container, .error-tip")
-            if error_elements:
-                error_message = error_elements[0].text
-                logger.info(f"Error message detected: {error_message}")
-                
-                result = {
-                    "error": error_message,
-                    "availability": "Not available",
-                    "hotel_name": "Unknown Hotel",
-                    "price": None,
-                    "taxes": None,
-                    "currency": "USD",
-                    "checkin_date": checkin_date,
-                    "checkout_date": checkout_date,
-                    "room_type": "Standard Room",
-                    "source_url": search_url
-                }
-                
-                if "minimum" in error_message.lower() or "night" in error_message.lower():
-                    result["alternative_dates"] = generate_alternative_dates(checkin_date, checkout_date)
-                
-                return result
-        except NoSuchElementException:
-            logger.info("No error message found, proceeding with hotel card scraping")
+            logger.info("No unavailability message found, proceeding with property card scraping")
 
-        # Proceed with hotel card (local selectors)
         hotel_card = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "section.main-container.main-content ul.long-list.long-list-v8 li[id]"))
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='property-card']"))
         )
-
-        hotel_name = hotel_card.find_element(By.CSS_SELECTOR, "div.list-card-title a.name").text
-        rating = hotel_card.find_element(By.CSS_SELECTOR, "div.score .real").text
-        reviews = hotel_card.find_element(By.CSS_SELECTOR, "div.count a").text
         
-        # Extract location if available
-        location_elements = hotel_card.find_elements(By.CSS_SELECTOR, "span[data-testid='address']")
-        location = location_elements[0].text if location_elements else "Unknown"
-        
-        # Extract distance from center if available
-        distance = hotel_card.find_element(By.CSS_SELECTOR, "p.transport span:nth-child(2)").text
-        
-        availability_url = hotel_card.find_element(By.CSS_SELECTOR, "a[href*='/hotels/detail']").get_attribute("href")
-        
-        currency = detect_currency(driver.page_source)
-        
-        # Try to find room type
         try:
-            room_type = hotel_card.find_element(By.CSS_SELECTOR, "span.room-panel-roominfo-name").text
+            hotel_name = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='title']").text
+        except NoSuchElementException:
+            hotel_name = "Unknown Hotel"
+        
+        try:
+            rating = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='review-score'] .dff2e52086").text
+        except NoSuchElementException:
+            rating = "N/A"
+        
+        try:
+            reviews = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='review-score'] .fff1944c52.fb14de7f14.eaa8455879").text
+        except NoSuchElementException:
+            reviews = "0 reviews"
+        
+        try:
+            location = hotel_card.find_element(By.CSS_SELECTOR, "span[data-testid='address']").text
+        except NoSuchElementException:
+            location = "Unknown"
+        
+        try:
+            distance = hotel_card.find_element(By.CSS_SELECTOR, "span[data-testid='distance']").text
+        except NoSuchElementException:
+            distance = "Unknown"
+        
+        try:
+            availability_url = hotel_card.find_element(By.CSS_SELECTOR, "a[data-testid='availability-cta-btn']").get_attribute("href")
+        except NoSuchElementException:
+            availability_url = search_url
+        
+        try:
+            room_type = hotel_card.find_element(By.CSS_SELECTOR, "div[data-testid='recommended-units'] h4").text
         except NoSuchElementException:
             room_type = "Standard Room"
         
-        # Try to extract price
         try:
-            price_element = hotel_card.find_element(By.CSS_SELECTOR, "div.real.labelColor")
-            price_text = price_element.text.replace("US$", "").strip()
+            price_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "span[data-testid='price-and-discounted-price'], div.fc-price span"))
+            )
+            price_text = price_element.text
             price = extract_price(price_text)
+            logger.info(f"Extracted price: {price_text} -> {price}")
             
-            # Try to extract taxes
             try:
-                taxes_info = hotel_card.find_element(By.CSS_SELECTOR, "p.price-explain").text
-                taxes_match = re.search(r'Total \(incl\. taxes & fees\): US\$(\d+\.?\d*)', taxes_info)
-                taxes = float(taxes_match.group(1)) - price if taxes_match else 0
-            except NoSuchElementException:
-                taxes = 0
-                
+                taxes_element = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='taxes-and-charges']"))
+                )
+                taxes_info = taxes_element.text
+                taxes = 0 if "Includes taxes and charges" in taxes_info else None
+                logger.info(f"Taxes info: {taxes_info}")
+            except (NoSuchElementException, TimeoutException) as e:
+                logger.warning(f"Taxes element not found: {str(e)}")
+                taxes = None
+            
+            currency = detect_currency(price_text, driver.page_source)
             availability = "Available" if price else "Not available"
-        except NoSuchElementException:
-            logger.warning("Price element not found, checking for unavailability indicators")
+        except (NoSuchElementException, TimeoutException) as e:
+            logger.warning(f"Price element not found: {str(e)}")
+            driver.save_screenshot(os.path.join(SCREENSHOTS_DIR, f'error_price_{timestamp}.png'))
             price = None
             taxes = None
+            currency = preferred_currency
             availability = "Not available"
 
         result = {
@@ -322,15 +295,19 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
             "source_url": availability_url
         }
         
-        logger.info(f"Scraped data from Trip.com: {result}")
+        if price is None and availability == "Not available":
+            result["alternative_dates"] = generate_alternative_dates(checkin_date, checkout_date)
+        
+        logger.info(f"Scraped data: {result}")
         return result
 
     except Exception as e:
-        logger.error(f"Scraping error on Trip.com: {str(e)}")
-        # Save error page content for debugging
-        with open('trip_error_page_content.html', 'w', encoding='utf-8') as f:
+        logger.error(f"Scraping error for URL {search_url}: {str(e)}", exc_info=True)
+        timestamp = int(time.time())
+        driver.save_screenshot(os.path.join(SCREENSHOTS_DIR, f'error_{timestamp}.png'))
+        with open(os.path.join(SCREENSHOTS_DIR, f'error_page_content_{timestamp}.html'), 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
-        return {"error": str(e)}
+        return {"error": f"Scraping failed: {str(e)}"}
     
     finally:
         cleanup_driver()

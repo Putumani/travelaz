@@ -1,3 +1,4 @@
+# Updated app.py - added preferred_currency handling
 import os
 import time
 import random
@@ -78,8 +79,9 @@ def process_booking_request(data):
         children = int(data.get('children', 0))
         rooms = int(data.get('rooms', 1))
         hotel_url = data.get('hotelUrl')
+        preferred_currency = data.get('preferred_currency', 'ZAR').upper()
 
-        logger.info(f"Processing Booking.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}")
+        logger.info(f"Processing Booking.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}, preferred_currency={preferred_currency}")
 
         if not hotel_url:
             return {"error": "Hotel URL is required"}
@@ -99,7 +101,8 @@ def process_booking_request(data):
             checkout_date=checkout_date,
             adults=adults,
             children=children,
-            rooms=rooms
+            rooms=rooms,
+            preferred_currency=preferred_currency
         )
 
         if supabase and 'error' not in result:
@@ -134,8 +137,9 @@ def process_trip_request(data):
         children = int(data.get('children', 0))
         rooms = int(data.get('rooms', 1))
         hotel_url = data.get('hotelUrl')
+        preferred_currency = data.get('preferred_currency', 'USD').upper()
 
-        logger.info(f"Processing Trip.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}")
+        logger.info(f"Processing Trip.com request: hotelUrl={hotel_url}, checkIn={checkin_date}, checkOut={checkout_date}, preferred_currency={preferred_currency}")
 
         if not hotel_url:
             return {"error": "Hotel URL is required"}
@@ -155,7 +159,8 @@ def process_trip_request(data):
             checkout_date=checkout_date,
             adults=adults,
             children=children,
-            rooms=rooms
+            rooms=rooms,
+            preferred_currency=preferred_currency
         )
 
         if supabase and 'error' not in result:

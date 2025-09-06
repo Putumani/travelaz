@@ -1,3 +1,4 @@
+// Updated src/components/ComparisonCard.jsx - added geolocation to detect real country and set preferred_currency
 import { useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { CurrencyContext } from '../context/CurrencyContext';
 import { LanguageContext } from '../context/LanguageContext';
@@ -33,6 +34,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [rooms, setRooms] = useState(1);
   const [alternativeDates, setAlternativeDates] = useState([]);
   const [originalAltDates, setOriginalAltDates] = useState([]);
+  const [preferredCurrency, setPreferredCurrency] = useState('USD');
   const { convertAmount, getCurrencySymbol, currentCurrency } = useContext(CurrencyContext);
   const { language } = useContext(LanguageContext);
   const { t } = useTranslation();
@@ -51,6 +53,39 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       setCheckOut(tomorrow);
     }
   }, [checkIn, checkOut]);
+
+  // Detect user's real location using geolocation API (ignores VPN)
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+          const data = await response.json();
+          const countryCode = data.countryCode;
+          let currency = 'USD';
+          if (countryCode === 'ZA') {
+            currency = 'ZAR';
+          } else if (['FR', 'DE', 'IT', 'ES', 'NL', 'BE', 'AT', 'PT', 'IE', 'FI', 'GR', 'SI', 'SK', 'EE', 'LV', 'LT', 'LU', 'MT', 'CY'].includes(countryCode)) {
+            currency = 'EUR';
+          } else if (countryCode === 'GB') {
+            currency = 'GBP';
+          }
+          setPreferredCurrency(currency);
+          console.log(`Detected country: ${countryCode}, Currency: ${currency}`);
+        } catch (err) {
+          console.error('Geolocation API error:', err);
+          setPreferredCurrency('USD'); // Fallback
+        }
+      }, (err) => {
+        console.error('Geolocation permission denied:', err);
+        setPreferredCurrency('USD'); // Fallback if permission denied
+      });
+    } else {
+      console.error('Geolocation not supported');
+      setPreferredCurrency('USD');
+    }
+  }, []);
 
   const fetchPrices = useCallback(async (forceFetch = false) => {
     if (!isOpen || !accommodation || isFetchingRef.current) return;
@@ -72,6 +107,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       adults,
       children,
       rooms,
+      preferred_currency: preferredCurrency,
     };
 
     const paramsChanged = !lastParamsRef.current || JSON.stringify(currentParams) !== JSON.stringify(lastParamsRef.current);
@@ -124,6 +160,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
               adults,
               children,
               rooms,
+              preferred_currency: preferredCurrency,
             }),
             credentials: 'omit',
             signal: abortControllerRef.current.signal,
@@ -134,13 +171,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             }
             return response.json();
           })
-          .then(data => {
-            if (data.success) {
-              return { source: source.name, data: data.data };
-            } else {
-              return { source: source.name, data: { error: data.error, alternative_dates: data.alternative_dates } };
-            }
-          })
+          .then(data => ({ source: source.name, data }))
           .catch(error => {
             console.error(`Error fetching from ${source.endpoint}:`, error);
             return { source: source.name, data: { error: error.message } };
@@ -263,7 +294,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       isFetchingRef.current = false;
       abortControllerRef.current = null;
     }
-  }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount]);
+  }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount, preferredCurrency]);
 
   useEffect(() => {
     if (isOpen && !hasInitialFetchRef.current) {
