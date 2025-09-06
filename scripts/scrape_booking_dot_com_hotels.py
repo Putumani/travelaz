@@ -52,7 +52,10 @@ def setup_driver():
             options.add_argument('--disable-web-security')
             options.add_argument('--allow-running-insecure-content')
             
-            service = Service()
+            # Specify using Chromium explicitly
+            options.binary_location = '/usr/bin/chromium'
+            
+            service = Service(executable_path='/usr/local/bin/chromedriver')
             _driver = webdriver.Chrome(service=service, options=options)
             
             _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
