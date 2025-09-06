@@ -7,8 +7,6 @@ from flask_cors import CORS
 from datetime import datetime, timedelta
 from supabase import create_client
 import atexit
-from scripts.scrape_booking_dot_com_hotels import cleanup_pool as cleanup_booking_pool, scrape_booking_hotel
-from scripts.scrape_trip_dot_com_hotels import cleanup_pool as cleanup_trip_pool
 import sys
 from pathlib import Path
 from threading import Lock
@@ -72,6 +70,8 @@ def check_cached_deals(hotel_url, checkin_date, checkout_date, source):
 
 def process_booking_request(data):
     try:
+        from scripts.scrape_booking_dot_com_hotels import scrape_booking_hotel
+        
         checkin_date = data.get('checkIn', datetime.now().strftime('%Y-%m-%d'))
         checkout_date = data.get('checkOut', (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'))
         adults = int(data.get('adults', 2))
@@ -91,7 +91,7 @@ def process_booking_request(data):
         if cached_data:
             return cached_data
 
-        time.sleep(random.uniform(0.5, 1.5))
+        time.sleep(random.uniform(1, 3))
 
         result = scrape_booking_hotel(
             hotel_url=hotel_url,
@@ -126,6 +126,8 @@ def process_booking_request(data):
 
 def process_trip_request(data):
     try:
+        from scripts.scrape_trip_dot_com_hotels import scrape_trip_hotel 
+
         checkin_date = data.get('checkIn', datetime.now().strftime('%Y-%m-%d'))
         checkout_date = data.get('checkOut', (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'))
         adults = int(data.get('adults', 2))
@@ -145,7 +147,7 @@ def process_trip_request(data):
         if cached_data:
             return cached_data
 
-        time.sleep(random.uniform(0.5, 1.5))
+        time.sleep(random.uniform(1, 3))
 
         result = scrape_trip_hotel(
             hotel_url=hotel_url,
@@ -177,12 +179,6 @@ def process_trip_request(data):
     except Exception as e:
         logger.error(f"Error processing Trip.com request: {str(e)}")
         return {"error": str(e)}
-
-@atexit.register
-def cleanup_on_exit():
-    logger.info("Cleaning up browser pools on application exit")
-    cleanup_booking_pool()
-    cleanup_trip_pool()
 
 @app.route('/scrape-booking', methods=['POST', 'OPTIONS'])
 def handle_scrape_booking_request():

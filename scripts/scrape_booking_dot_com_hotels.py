@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from datetime import datetime, timedelta
+import json
 import time
 import os
 import re
@@ -12,8 +13,6 @@ from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import logging
 from threading import Lock
 import random
-import atexit
-import shutil
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -27,41 +26,38 @@ _driver_lock = Lock()
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
 
-import tempfile
-import uuid
-
 def setup_driver():
     global _driver
     with _driver_lock:
         if _driver is None: 
             options = webdriver.ChromeOptions()
             
+            # Always use headless in production
             options.add_argument('--headless=new')
+            
+            # Memory and performance optimizations
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-gpu')
             options.add_argument('--window-size=1280,1024')
             options.add_argument('--disable-setuid-sandbox')
             options.add_argument('--ignore-certificate-errors')
+            
+            # Reduce memory usage
             options.add_argument('--disable-extensions')
             options.add_argument('--disable-software-rasterizer')
-            options.add_argument('--disable-background-timer-throttling')
-            options.add_argument('--disable-backgrounding-occluded-windows')
-            options.add_argument('--disable-renderer-backgrounding')
-            options.add_argument('--disable-features=VizDisplayCompositor')
             
-            user_data_dir = f"/tmp/chrome-data-{uuid.uuid4().hex}"
-            options.add_argument(f'--user-data-dir={user_data_dir}')
-            options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.80 Safari/537.36')
+            # Security and automation detection avoidance
+            options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36')
             options.add_argument('--disable-blink-features=AutomationControlled')
             options.add_experimental_option("excludeSwitches", ["enable-automation"])
             options.add_experimental_option('useAutomationExtension', False)
-            options.add_argument('--memory-pressure-off')
             
             try:
-                service = ChromeService(ChromeDriverManager(version="140.0.7339.80").install(), log_path='/app/chromedriver.log')
+                # Use webdriver-manager to handle ChromeDriver
+                service = ChromeService(ChromeDriverManager().install())
                 _driver = webdriver.Chrome(service=service, options=options)
-                _driver.user_data_dir = user_data_dir
+                
                 _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
                     'source': '''
                         Object.defineProperty(navigator, 'webdriver', {
@@ -69,118 +65,23 @@ def setup_driver():
                         })
                     '''
                 })
-                logger.info(f"Initialized new WebDriver instance with user data dir: {user_data_dir}")
+                
+                logger.info("Initialized WebDriver instance")
             except Exception as e:
                 logger.error(f"Failed to initialize WebDriver: {str(e)}")
-                try:
-                    if os.path.exists(user_data_dir):
-                        shutil.rmtree(user_data_dir)
-                except:
-                    pass
                 raise
         return _driver
 
-_browser_pool = []
-_max_pool_size = 1 
-_pool_lock = Lock()
-
-def get_driver_from_pool():
-    global _browser_pool
-    with _pool_lock:
-        if _browser_pool:
-            logger.info("Reusing browser instance from pool")
-            return _browser_pool.pop()
-        else:
-            logger.info("Creating new browser instance (pool empty)")
-            return setup_driver_singleton()
-
-def return_driver_to_pool(driver):
-    global _browser_pool, _max_pool_size
-    with _pool_lock:
-        if len(_browser_pool) < _max_pool_size:
-            try:
-                driver.execute_script("window.open('about:blank', '_self');")
-                driver.close()
-                driver.switch_to.window(driver.window_handles[0])
-                _browser_pool.append(driver)
-                logger.info(f"Returned browser to pool. Pool size: {len(_browser_pool)}")
-            except Exception as e:
-                logger.error(f"Error cleaning browser for pool: {str(e)}")
-                try:
-                    driver.quit()
-                except:
-                    pass
-        else:
-            try:
-                driver.quit()
-                logger.info("Quit browser instance (pool full)")
-            except:
-                pass
-
-def cleanup_pool():
-    global _browser_pool
-    with _pool_lock:
-        for driver in _browser_pool:
-            try:
-                driver.quit()
-            except:
-                pass
-        _browser_pool = []
-        logger.info("Cleaned up browser pool")
-
-def setup_driver_singleton():
-    options = webdriver.ChromeOptions()
-    options.add_argument('--headless=new')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--window-size=1280,1024')
-    options.add_argument('--disable-setuid-sandbox')
-    options.add_argument('--ignore-certificate-errors')
-    options.add_argument('--disable-extensions')
-    options.add_argument('--disable-software-rasterizer')
-    options.add_argument('--disable-background-timer-throttling')
-    options.add_argument('--disable-backgrounding-occluded-windows')
-    options.add_argument('--disable-renderer-backgrounding')
-    options.add_argument('--user-data-dir=/tmp/chrome-singleton')
-    options.add_argument('--incognito')
-    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.80 Safari/537.36')
-    options.add_argument('--disable-blink-features=AutomationControlled')
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-    
-    try:
-        service = ChromeService(ChromeDriverManager(version="140.0.7339.80").install(), log_path='/app/chromedriver.log')
-        driver = webdriver.Chrome(service=service, options=options)
-        driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-            'source': '''
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                })
-            '''
-        })
-        logger.info("Initialized singleton WebDriver instance")
-        return driver
-    except Exception as e:
-        logger.error(f"Failed to initialize WebDriver: {str(e)}")
-        raise
-
-def cleanup_driver_singleton():
+def cleanup_driver():
     global _driver
     with _driver_lock:
         if _driver is not None:
             try:
-                _driver.execute_script("window.open('about:blank', '_self');")
-                _driver.close()
-                _driver.switch_to.window(_driver.window_handles[0])
-                logger.info("Cleaned up tabs, keeping browser instance alive")
+                _driver.quit()
+                _driver = None
+                logger.info("WebDriver instance closed")
             except Exception as e:
                 logger.error(f"Error during driver cleanup: {str(e)}")
-                try:
-                    _driver.quit()
-                    _driver = None
-                except:
-                    pass
 
 def modify_hotel_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
     parsed = urlparse(original_url)
@@ -231,18 +132,7 @@ def generate_alternative_dates(checkin_date, checkout_date):
     except ValueError:
         return []
 
-def cleanup_files():
-    for file in ['page_content.html', 'error_page_content.html']:
-        if os.path.exists(file):
-            try:
-                os.remove(file)
-                logger.info(f"Removed temporary file: {file}")
-            except Exception as e:
-                logger.error(f"Failed to remove {file}: {str(e)}")
-
-atexit.register(cleanup_files)
-
-def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1, driver=None):
+def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):
     try:
         checkin_dt = datetime.strptime(checkin_date, '%Y-%m-%d').date()
         checkout_dt = datetime.strptime(checkout_date, '%Y-%m-%d').date()
@@ -258,14 +148,13 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
 
     logger.info(f"Processing dates: checkIn={checkin_date}, checkOut={checkout_date}")
 
-    use_external_driver = driver is not None
-    if not use_external_driver:
-        driver = setup_driver()
+    driver = setup_driver()
+    
     try:
         search_url = modify_hotel_url(hotel_url, checkin_date, checkout_date, adults, children, rooms)
         logger.info(f"Loading hotel URL: {search_url}")
         
-        max_retries = 2
+        max_retries = 3
         for attempt in range(max_retries):
             try:
                 driver.get(search_url)
@@ -360,18 +249,7 @@ def scrape_booking_hotel(hotel_url, checkin_date, checkout_date, adults=2, child
         return {"error": str(e)}
     
     finally:
-        if not use_external_driver:
-            cleanup_driver()
+        cleanup_driver()
 
-def cleanup_driver():
-    global _driver
-    with _driver_lock:
-        if _driver is not None:
-            try:
-                _driver.quit()
-                _driver = None
-                logger.info("WebDriver instance manually closed")
-            except Exception:
-                pass
-
+import atexit
 atexit.register(cleanup_driver)
