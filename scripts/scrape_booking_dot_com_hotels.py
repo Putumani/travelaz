@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -26,29 +27,37 @@ _driver_lock = Lock()
 def setup_driver():
     global _driver
     with _driver_lock:
-        if _driver is None: 
-            options = webdriver.ChromeOptions()
-            options.add_argument('--ignore-certificate-errors')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--window-size=1920,1080')
-            options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36')
-            options.add_argument('--disable-cache')
-            options.add_argument('--disable-blink-features=AutomationControlled')
-            options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            options.add_experimental_option('useAutomationExtension', False)
-            service = Service()
-            _driver = webdriver.Chrome(service=service, options=options)
-            
-            _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                'source': '''
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    })
-                '''
-            })
-            
-            logger.info("Initialized new WebDriver instance")
+        if _driver is None:
+            try:
+                options = webdriver.ChromeOptions()
+                options.add_argument('--ignore-certificate-errors')
+                options.add_argument('--disable-dev-shm-usage')
+                options.add_argument('--no-sandbox')
+                options.add_argument('--window-size=1920,1080')
+                options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36')
+                options.add_argument('--disable-cache')
+                options.add_argument('--disable-blink-features=AutomationControlled')
+                options.add_experimental_option("excludeSwitches", ["enable-automation"])
+                options.add_experimental_option('useAutomationExtension', False)
+                
+                # Use webdriver-manager to install ChromeDriver
+                service = Service(ChromeDriverManager().install())
+                _driver = webdriver.Chrome(service=service, options=options)
+                
+                _driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                    'source': '''
+                        Object.defineProperty(navigator, 'webdriver', {
+                            get: () => undefined
+                        })
+                    '''
+                })
+                
+                logger.info(f"Initialized new WebDriver instance with ChromeDriver at {service.path}")
+                logger.info(f"Chrome version: {_driver.capabilities['browserVersion']}")
+                logger.info(f"ChromeDriver version: {_driver.capabilities['chrome']['chromedriverVersion']}")
+            except Exception as e:
+                logger.error(f"Failed to initialize WebDriver: {str(e)}")
+                raise
         return _driver
 
 def modify_hotel_url(original_url, checkin_date, checkout_date, adults=2, children=0, rooms=1):

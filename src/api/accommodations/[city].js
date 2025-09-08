@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await supabase
       .from('accommodations')
-      .select('*, booking_dot_com_affiliate_url, expedia_affiliate_url, hotels_dot_com_affiliate_url, trip_dot_com_affiliate_url')
+      .select('*, booking_dot_com_affiliate_url, trip_dot_com_affiliate_url')
       .ilike('city', `%${city.toLowerCase()}%`)
       .order('rating', { ascending: false })
       .limit(10);
@@ -35,10 +35,7 @@ export default async function handler(req, res) {
         image_url: imageUrl,
         affiliate_deals: [
           { site_name: 'Booking.com', affiliate_url: item.booking_dot_com_affiliate_url, price: item.price },
-          { site_name: 'Expedia', affiliate_url: item.expedia_affiliate_url, price: item.price },
-          { site_name: 'Hotels.com', affiliate_url: item.hotels_dot_com_affiliate_url, price: item.price },
           { site_name: 'Trip.com', affiliate_url: item.trip_dot_com_affiliate_url, price: item.price },
-          { site_name: 'Priceline', affiliate_url: item.priceline_affiliate_url, price: item.price }
         ].filter(deal => deal.affiliate_url),
       };
     });
