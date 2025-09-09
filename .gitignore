@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+page_content.html
+trip_page_content.html
+trip_error_page_content.html
 
 # Editor directories and files
 .vscode/*
