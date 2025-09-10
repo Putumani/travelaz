@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await supabase
       .from('accommodations')
-      .select('*, booking_dot_com_affiliate_url, expedia_affiliate_url, hotels_dot_com_affiliate_url, trip_dot_com_affiliate_url')
+      .select('*, booking_dot_com_affiliate_url, trip_dot_com_affiliate_url')
       .ilike('city', `%${city.toLowerCase()}%`)
       .order('rating', { ascending: false })
       .limit(10);
