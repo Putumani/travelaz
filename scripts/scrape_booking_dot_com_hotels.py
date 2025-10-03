@@ -26,7 +26,7 @@ _driver_lock = Lock()
 
 def setup_driver():
     global _driver
-    with _driver_lock:  # Fixed typo: _river_lock -> _driver_lock
+    with _driver_lock:  
         if _driver is None:
             try:
                 options = webdriver.ChromeOptions()

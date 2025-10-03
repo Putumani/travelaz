@@ -29,8 +29,7 @@ function Home() {
       }
 
       console.log('Popular hotels data:', data);
-      // Filter out hotels with missing required fields
-      const validHotels = data.filter(hotel => 
+      const validHotels = data.filter(hotel =>
         hotel.id && hotel.name && typeof hotel.price === 'number' && hotel.rating
       );
       setPopularHotels(validHotels);
@@ -62,10 +61,10 @@ function Home() {
         <h2 className="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8 text-black">{t('FeaturedDestinations')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           <Link to="/durban" className="block">
-            <div 
-              className="bg-cover bg-center h-52 sm:h-56 lg:h-64 rounded-lg shadow-md" 
-              style={{ 
-                backgroundImage: `url(https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_400,c_fill/Durban-Beach-View_pgvgag)` 
+            <div
+              className="bg-cover bg-center h-52 sm:h-56 lg:h-64 rounded-lg shadow-md"
+              style={{
+                backgroundImage: `url(https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_400,c_fill/Durban-Beach-View_pgvgag)`
               }}
             >
               <div className="bg-black bg-opacity-50 h-full flex items-center justify-center rounded-lg">
@@ -74,10 +73,10 @@ function Home() {
             </div>
           </Link>
           <Link to="/capetown" className="block">
-            <div 
-              className="bg-cover bg-center h-52 sm:h-56 lg:h-64 rounded-lg shadow-md" 
-              style={{ 
-                backgroundImage: `url(https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_400,c_fill/pexels-jvdm-3736245_d6d1jc)` 
+            <div
+              className="bg-cover bg-center h-52 sm:h-56 lg:h-64 rounded-lg shadow-md"
+              style={{
+                backgroundImage: `url(https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_400,c_fill/pexels-jvdm-3736245_d6d1jc)`
               }}
             >
               <div className="bg-black bg-opacity-50 h-full flex items-center justify-center rounded-lg">
@@ -86,10 +85,10 @@ function Home() {
             </div>
           </Link>
           <Link to="/bangkok" className="block">
-            <div 
-              className="bg-cover bg-center h-52 sm:h-56 lg:h-64 rounded-lg shadow-md" 
-              style={{ 
-                backgroundImage: `url(https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_400,c_fill/pexels-jimmy-teoh-294331-2402000_y1e72y)` 
+            <div
+              className="bg-cover bg-center h-52 sm:h-56 lg:h-64 rounded-lg shadow-md"
+              style={{
+                backgroundImage: `url(https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_400,c_fill/pexels-jimmy-teoh-294331-2402000_y1e72y)`
               }}
             >
               <div className="bg-black bg-opacity-50 h-full flex items-center justify-center rounded-lg">

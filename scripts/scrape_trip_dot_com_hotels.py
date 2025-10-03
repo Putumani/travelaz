@@ -80,7 +80,6 @@ def modify_hotel_url(original_url, checkin_date, checkout_date, adults=2, childr
     }
     query_params['locale'] = [locale_mapping.get(currency.upper(), 'en-US')]
 
-    # Remove conflicting date parameters
     for param in ['checkin', 'checkout', 'subStamp', 'subChannel', 'travelpurpose']:
         if param in query_params:
             del query_params[param]
@@ -179,7 +178,6 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
         with open('trip_page_content.html', 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
 
-        # Check for unavailability message first
         try:
             no_results_div = driver.find_element(By.CSS_SELECTOR, "div.no-results")
             error_message = no_results_div.find_element(By.CSS_SELECTOR, "span").text
@@ -201,7 +199,6 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
         except NoSuchElementException:
             logger.info("No unavailability message found, proceeding with hotel card scraping")
 
-        # Proceed with scraping hotel details
         hotel_card = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "section.main-container.main-content ul.long-list.long-list-v8 li[id]"))
         )
@@ -213,7 +210,6 @@ def scrape_trip_hotel(hotel_url, checkin_date, checkout_date, adults=2, children
         distance = hotel_card.find_element(By.CSS_SELECTOR, "p.transport span:nth-child(2)").text
         availability_url = hotel_card.find_element(By.CSS_SELECTOR, "a[href*='/hotels/detail']").get_attribute("href")
         
-        # Make room type extraction optional
         try:
             room_type = hotel_card.find_element(By.CSS_SELECTOR, "span.room-panel-roominfo-name").text
         except NoSuchElementException:
