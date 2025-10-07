@@ -43,6 +43,15 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const abortControllerRef = useRef(null);
 
   useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [isOpen]);
+
+  useEffect(() => {
     const tomorrow = new Date(checkIn);
     tomorrow.setDate(checkIn.getDate() + 1);
     const checkInDate = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate());
@@ -390,12 +399,19 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    // UPDATED: Higher z-index, backdrop blur for better overlay feel
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999]">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold">{accommodation.name}</h3>
-            <button onClick={() => { if (abortControllerRef.current) abortControllerRef.current.abort(); onClose(); }} className="text-gray-500 hover:text-gray-700">
+            <button
+              onClick={() => {
+                if (abortControllerRef.current) abortControllerRef.current.abort();
+                onClose();
+              }}
+              className="text-gray-500 hover:text-gray-700"
+            >
               ✕
             </button>
           </div>
