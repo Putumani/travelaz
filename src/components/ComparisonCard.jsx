@@ -33,9 +33,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [rooms, setRooms] = useState(1);
   const [alternativeDates, setAlternativeDates] = useState([]);
   const [originalAltDates, setOriginalAltDates] = useState([]);
+
   const { convertAmount, getCurrencySymbol, currentCurrency } = useContext(CurrencyContext);
   const { language } = useContext(LanguageContext);
   const { t } = useTranslation();
+
   const isFetchingRef = useRef(false);
   const hasInitialFetchRef = useRef(false);
   const lastSuccessfulDataRef = useRef(null);
@@ -310,7 +312,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         };
       }
     }
-  }, [currentCurrency, convertAmount, language, t, deals, alternativeDates, originalDeals, originalAltDates]);
+  }, [currentCurrency, convertAmount, language, t, originalDeals, originalAltDates]);
 
   const handleUpdateSearch = () => {
     const checkInDate = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate());
@@ -329,8 +331,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         <InputNumber
           min={1}
           max={30}
-          value={adults}
-          onChange={(value) => setAdults(value != null ? value : 2)}
+          onChange={(value) => {
+            if (value !== null && value !== adults) {
+              setAdults(value);
+            }
+          }}
           className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           aria-label={t('Adults')}
           autoFocus={false}
@@ -347,7 +352,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           min={0}
           max={9}
           value={children}
-          onChange={(value) => setChildren(value != null ? value : 0)}
+          onChange={(value) => {
+            if (value !== null && value !== children) {
+              setChildren(value);
+            }
+          }}
           className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           aria-label={t('Children')}
           autoFocus={false}
@@ -364,7 +373,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
           min={1}
           max={30}
           value={rooms}
-          onChange={(value) => setRooms(value != null ? value : 1)}
+          onChange={(value) => {
+            if (value !== null && value !== rooms) {
+              setRooms(value);
+            }
+          }}
           className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           aria-label={t('Rooms')}
           autoFocus={false}
@@ -381,7 +394,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const AlternativeDatesList = () => (
     <div className="mt-4">
       <h4 className="font-medium mb-2">{t('tryTheseDates')}</h4>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {alternativeDates.map((alt, i) => (
           <div key={i} className="p-2 border rounded bg-gray-50">
             <div className="font-medium">{alt.dates}</div>
@@ -399,18 +412,17 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    // UPDATED: Higher z-index, backdrop blur for better overlay feel
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold">{accommodation.name}</h3>
+            <h3 className="text-xl font-bold truncate pr-2">{accommodation.name}</h3>
             <button
               onClick={() => {
                 if (abortControllerRef.current) abortControllerRef.current.abort();
                 onClose();
               }}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-gray-500 hover:text-gray-700 flex-shrink-0"
             >
               ✕
             </button>
@@ -418,7 +430,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
 
           <div className="mb-6">
             <h4 className="font-medium mb-2">{t('selectDates')}</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm mb-1">{t('checkIn')}</label>
                 <DatePicker
@@ -428,6 +440,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                   className="w-full"
                   format="dd/MM/yyyy"
                   disabled={loading || isFetchingRef.current}
+                  calendarClassName="mobile-calendar"
                 />
               </div>
               <div>
@@ -439,6 +452,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                   className="w-full"
                   format="dd/MM/yyyy"
                   disabled={loading || isFetchingRef.current}
+                  calendarClassName="mobile-calendar"
                 />
               </div>
             </div>
@@ -446,7 +460,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             <button
               onClick={handleUpdateSearch}
               disabled={loading || isFetchingRef.current}
-              className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-blue-400"
+              className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-blue-400 transition-colors"
             >
               {loading ? <LoadingSpinner size="small" /> : t('updateSearch')}
             </button>
@@ -469,22 +483,22 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
               deals
                 .sort((a, b) => (a.price || Infinity) - (b.price || Infinity))
                 .map((deal, i) => (
-                  <div key={i} className="flex justify-between items-center py-3 border-b">
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                  <div key={i} className="flex justify-between items-center py-3 border-b last:border-b-0">
+                    <div className="flex items-center flex-grow min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3 flex-shrink-0">
                         {deal.site_name.charAt(0)}
                       </div>
-                      <div>
-                        <div className="font-medium">{deal.site_name}</div>
+                      <div className="min-w-0 flex-grow">
+                        <div className="font-medium truncate">{deal.site_name}</div>
                         <div className={`text-xs ${deal.availabilityStatus === 'Available' ? 'text-green-600' : 'text-red-600'}`}>
                           {deal.available}
                         </div>
                         {deal.roomType && (
-                          <div className="text-xs text-gray-500">{deal.roomType}</div>
+                          <div className="text-xs text-gray-500 truncate">{deal.roomType}</div>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center">
+                    <div className="flex items-center flex-shrink-0 ml-2">
                       <span className="font-bold mr-4">
                         {getCurrencySymbol()}
                         {deal.price ? deal.price.toFixed(2) : 'N/A'}
@@ -493,7 +507,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
                         href={deal.affiliate_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1 bg-black text-white text-sm rounded hover:bg-gray-800"
+                        className="px-3 py-1 bg-black text-white text-sm rounded hover:bg-gray-800 transition-colors"
                       >
                         {t('viewDeal')}
                       </a>

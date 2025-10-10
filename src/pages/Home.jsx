@@ -1,10 +1,11 @@
+// Home.jsx
 import Hero from '@/components/Hero';
 import { Link, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import AccommodationCard from '@/components/AccommodationCard';
-import ErrorBoundary from '@/components/ErrorBoundary';
+import ErrorBoundary from '@/components/ErrorBoundary'; // Import the ErrorBoundary
 import { useTranslation } from '../i18n/useTranslation';
 
 function Home() {
@@ -38,6 +39,26 @@ function Home() {
     fetchPopularHotels();
   }, [location, t]);
 
+  // Custom fallback for individual hotel cards
+  const hotelCardFallback = ({ error, retry }) => (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden border border-red-200">
+      <div className="h-40 bg-red-100 flex items-center justify-center">
+        <span className="text-red-600">Error loading hotel</span>
+      </div>
+      <div className="p-4">
+        <p className="text-red-600 text-sm mb-2">
+          {t('errorLoadingHotel', { defaultValue: 'Error loading hotel information' })}
+        </p>
+        <button 
+          onClick={retry}
+          className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+        >
+          {t('tryAgain', { defaultValue: 'Try Again' })}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <Layout>
       <Hero />
@@ -48,7 +69,11 @@ function Home() {
             <div className="text-center text-red-500">{errorMessage}</div>
           ) : popularHotels.length > 0 ? (
             popularHotels.map((hotel) => (
-              <ErrorBoundary key={hotel.id}>
+              // Wrap each hotel card with ErrorBoundary
+              <ErrorBoundary 
+                key={hotel.id}
+                fallback={hotelCardFallback}
+              >
                 <AccommodationCard accommodation={hotel} />
               </ErrorBoundary>
             ))

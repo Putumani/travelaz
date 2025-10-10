@@ -4,6 +4,7 @@ import 'react-lazy-load-image-component/src/effects/blur.css';
 import ComparisonCard from './ComparisonCard';
 import { CurrencyContext } from '../context/CurrencyContext';
 import { useTranslation } from '../i18n/useTranslation';
+import ErrorBoundary from './ErrorBoundary'; // Import the ErrorBoundary
 
 function AccommodationCard({ accommodation }) {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -18,7 +19,10 @@ function AccommodationCard({ accommodation }) {
         setIsLoadingPrice(true);
         try {
           const price = await convertAmount(accommodation.price, 'USD'); 
-          setConvertedPrice(price);
+          // Only update state if price has actually changed
+          if (price !== convertedPrice) {
+            setConvertedPrice(price);
+          }
         } catch (error) {
           console.error('Error converting price:', error);
           setConvertedPrice(accommodation.price.toFixed(2)); 
@@ -30,7 +34,7 @@ function AccommodationCard({ accommodation }) {
       }
     };
     updatePrice();
-  }, [accommodation, convertAmount]);
+  }, [accommodation, convertAmount, convertedPrice]);
 
   const handleCardClick = () => {
     setIsPopupOpen(true);
@@ -40,6 +44,42 @@ function AccommodationCard({ accommodation }) {
     e.stopPropagation();
     setIsPopupOpen(true);
   };
+
+  // Custom fallback for the ComparisonCard error
+  const comparisonCardFallback = ({ error, retry }) => (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-red-800">
+            {t('errorLoadingHotel', { defaultValue: 'Error loading hotel comparison' })}
+          </h3>
+          <button
+            onClick={retry}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            ✕
+          </button>
+        </div>
+        <p className="text-gray-600 mb-4">
+          {t('errorLoadingComparison', { defaultValue: 'We encountered an error while loading hotel prices. Please try again.' })}
+        </p>
+        <button 
+          onClick={retry}
+          className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+        >
+          {t('tryAgain', { defaultValue: 'Try Again' })}
+        </button>
+        {process.env.NODE_ENV === 'development' && (
+          <details className="mt-4 text-sm text-red-700">
+            <summary className="cursor-pointer font-medium">Error Details</summary>
+            <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto text-xs">
+              {error && error.toString()}
+            </pre>
+          </details>
+        )}
+      </div>
+    </div>
+  );
 
   if (!accommodation || !accommodation.name) {
     return (
@@ -130,13 +170,19 @@ function AccommodationCard({ accommodation }) {
         </div>
       </div>
 
-      <ComparisonCard
-        accommodation={accommodation}
-        isOpen={isPopupOpen}
-        onClose={() => setIsPopupOpen(false)}
-      />
+      {/* Wrap ComparisonCard with ErrorBoundary */}
+      <ErrorBoundary 
+        fallback={comparisonCardFallback}
+        onError={(error) => console.error('ComparisonCard error:', error)}
+      >
+        <ComparisonCard
+          accommodation={accommodation}
+          isOpen={isPopupOpen}
+          onClose={() => setIsPopupOpen(false)}
+        />
+      </ErrorBoundary>
     </div>
   );
 }
 
-export default AccommodationCard; 
+export default AccommodationCard;
