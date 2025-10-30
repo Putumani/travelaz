@@ -324,72 +324,83 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     fetchPrices(true);
   };
 
-  const GuestControls = () => (
-    <div className="grid grid-cols-3 gap-4 mt-2">
-      <div>
-        <label className="block text-sm">{t('Adults')}</label>
-        <InputNumber
-          min={1}
-          max={30}
-          onChange={(value) => {
-            if (value !== null && value !== adults) {
-              setAdults(value);
-            }
-          }}
-          className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label={t('Adults')}
-          autoFocus={false}
-          upHandler={<span className="text-gray-500">+</span>}
-          downHandler={<span className="text-gray-500">-</span>}
-          formatter={(value) => `${value}`}
-          parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 2)}
-          disabled={loading || isFetchingRef.current}
-        />
+  const GuestControls = () => {
+    const handleAdultsChange = (value) => {
+      if (value !== null && value !== adults) {
+        setAdults(value);
+      }
+    };
+
+    const handleChildrenChange = (value) => {
+      if (value !== null && value !== children) {
+        setChildren(value);
+      }
+    };
+
+    const handleRoomsChange = (value) => {
+      if (value !== null && value !== rooms) {
+        setRooms(value);
+      }
+    };
+
+    return (
+      <div className="grid grid-cols-3 gap-4 mt-2">
+        <div>
+	  <label className="block text-sm">{t('Adults')}</label>
+	  <InputNumber
+	    value={adults}
+	    min={1}
+	    max={30}
+	    onChange={handleAdultsChange}
+	    className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+	    aria-label={t('Adults')}
+	    autoFocus={false}
+	    upHandler={<span className="text-gray-500">+</span>}
+	    downHandler={<span className="text-gray-500">-</span>}
+	    formatter={(value) => `${value}`}
+	    parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 2)}
+	    disabled={loading || isFetchingRef.current}
+	  />
+        </div>
+
+        <div>
+	  <label className="block text-sm">{t('Children')}</label>
+	  <InputNumber
+	    value={children}
+	    min={0}
+	    max={9}
+	    onChange={handleChildrenChange}
+	    className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+	    aria-label={t('Children')}
+	    autoFocus={false}
+	    upHandler={<span className="text-gray-500">+</span>}
+	    downHandler={<span className="text-gray-500">-</span>}
+	    formatter={(value) => `${value}`}
+	    parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 0)}
+	    disabled={loading || isFetchingRef.current}
+	  />
+        </div>
+
+        <div>
+	  <label className="block text-sm">{t('Rooms')}</label>
+	  <InputNumber
+	    value={rooms}
+	    min={1}
+	    max={30}
+	    onChange={handleRoomsChange}
+	    className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+	    aria-label={t('Rooms')}
+	    autoFocus={false}
+	    upHandler={<span className="text-gray-500">+</span>}
+	    downHandler={<span className="text-gray-500">-</span>}
+	    formatter={(value) => `${value}`}
+	    parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 1)}
+	    disabled={loading || isFetchingRef.current}
+	  />
+        </div>
       </div>
-      <div>
-        <label className="block text-sm">{t('Children')}</label>
-        <InputNumber
-          min={0}
-          max={9}
-          value={children}
-          onChange={(value) => {
-            if (value !== null && value !== children) {
-              setChildren(value);
-            }
-          }}
-          className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label={t('Children')}
-          autoFocus={false}
-          upHandler={<span className="text-gray-500">+</span>}
-          downHandler={<span className="text-gray-500">-</span>}
-          formatter={(value) => `${value}`}
-          parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 0)}
-          disabled={loading || isFetchingRef.current}
-        />
-      </div>
-      <div>
-        <label className="block text-sm">{t('Rooms')}</label>
-        <InputNumber
-          min={1}
-          max={30}
-          value={rooms}
-          onChange={(value) => {
-            if (value !== null && value !== rooms) {
-              setRooms(value);
-            }
-          }}
-          className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label={t('Rooms')}
-          autoFocus={false}
-          upHandler={<span className="text-gray-500">+</span>}
-          downHandler={<span className="text-gray-500">-</span>}
-          formatter={(value) => `${value}`}
-          parser={(value) => (value ? parseInt(value.replace(/\D/g, '')) : 1)}
-          disabled={loading || isFetchingRef.current}
-        />
-      </div>
-    </div>
-  );
+    );
+  };
 
   const AlternativeDatesList = () => (
     <div className="mt-4">

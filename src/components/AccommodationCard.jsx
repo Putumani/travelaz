@@ -18,19 +18,18 @@ function AccommodationCard({ accommodation }) {
       if (accommodation?.price != null && typeof accommodation.price === 'number') {
         setIsLoadingPrice(true);
         try {
-          const price = await convertAmount(accommodation.price, 'USD'); 
-          // Only update state if price has actually changed
+          const price = await convertAmount(accommodation.price, 'USD');
           if (price !== convertedPrice) {
             setConvertedPrice(price);
           }
         } catch (error) {
           console.error('Error converting price:', error);
-          setConvertedPrice(accommodation.price.toFixed(2)); 
+          setConvertedPrice(accommodation.price.toFixed(2));
         } finally {
           setIsLoadingPrice(false);
         }
       } else {
-        setConvertedPrice(null); 
+        setConvertedPrice(null);
       }
     };
     updatePrice();
@@ -45,7 +44,6 @@ function AccommodationCard({ accommodation }) {
     setIsPopupOpen(true);
   };
 
-  // Custom fallback for the ComparisonCard error
   const comparisonCardFallback = ({ error, retry }) => (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -63,7 +61,7 @@ function AccommodationCard({ accommodation }) {
         <p className="text-gray-600 mb-4">
           {t('errorLoadingComparison', { defaultValue: 'We encountered an error while loading hotel prices. Please try again.' })}
         </p>
-        <button 
+        <button
           onClick={retry}
           className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
         >
@@ -170,8 +168,7 @@ function AccommodationCard({ accommodation }) {
         </div>
       </div>
 
-      {/* Wrap ComparisonCard with ErrorBoundary */}
-      <ErrorBoundary 
+      <ErrorBoundary
         fallback={comparisonCardFallback}
         onError={(error) => console.error('ComparisonCard error:', error)}
       >
