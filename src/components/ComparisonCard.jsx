@@ -10,6 +10,36 @@ import InputNumber from 'rc-input-number';
 import 'rc-input-number/assets/index.css';
 import { debounce } from 'lodash';
 
+const CACHE_KEY_PREFIX = 'comparison_cache_';
+const CACHE_TTL = 10 * 60 * 1500;
+
+const getCacheKey = (hotelId, params) => {
+  return `${CACHE_KEY_PREFIX}${hotelId}_${btoa(JSON.stringify(params))}`;
+};
+
+const getCachedData = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { data, timestamp } = JSON.parse(raw);
+    if (Date.now() - timestamp > CACHE_TTL) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedData = (key, data) => {
+  try {
+    localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch (e) {
+    console.warn('LocalStorage full, clearing old cache...');
+  }
+};
+
 function formatDateToLocal(date) {
   if (!date) return '';
   const year = date.getFullYear();
@@ -19,6 +49,8 @@ function formatDateToLocal(date) {
 }
 
 function ComparisonCard({ accommodation, isOpen, onClose }) {
+  const hotelId = accommodation.id || accommodation.name;
+
   const [deals, setDeals] = useState([]);
   const [originalDeals, setOriginalDeals] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -41,9 +73,6 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const { t } = useTranslation();
 
   const isFetchingRef = useRef(false);
-  const hasInitialFetchRef = useRef(false);
-  const lastSuccessfulDataRef = useRef(null);
-  const lastParamsRef = useRef(null);
   const abortControllerRef = useRef(null);
 
   const debouncedSetAdults = useMemo(() => debounce(setAdults, 300), []);
@@ -59,24 +88,48 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   }, [debouncedSetAdults, debouncedSetChildren, debouncedSetRooms]);
 
   useEffect(() => {
-    if (isOpen) {
-      setAdults(2);
-      setChildren(0);
-      setRooms(1);
-      setChildAges([]);
-      setCheckIn(new Date());
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setCheckOut(tomorrow);
+    if (!isOpen || !accommodation) return;
 
-      const timer = setTimeout(() => fetchPrices(true), 100);
-      hasInitialFetchRef.current = true;
-      return () => clearTimeout(timer);
-    } else {
-      if (abortControllerRef.current) abortControllerRef.current.abort();
-      hasInitialFetchRef.current = false;
+    const currentParams = {
+      checkIn: formatDateToLocal(checkIn),
+      checkOut: formatDateToLocal(checkOut),
+      adults,
+      children,
+      rooms,
+      child_ages: childAges.length > 0 ? childAges.join(',') : undefined,
+      currency: currentCurrency,
+    };
+
+    const cacheKey = getCacheKey(hotelId, currentParams);
+    const cached = getCachedData(cacheKey);
+
+    if (cached) {
+      setDeals(cached.deals);
+      setOriginalDeals(cached.originalDeals);
+      setAlternativeDates(cached.alternativeDates);
+      setOriginalAltDates(cached.originalAltDates);
+      setError(cached.error);
+      setCheckIn(new Date(cached.params.checkIn));
+      setCheckOut(new Date(cached.params.checkOut));
+      setAdults(cached.params.adults);
+      setChildren(cached.params.children);
+      setRooms(cached.params.rooms);
+      setChildAges(cached.params.child_ages ? cached.params.child_ages.split(',').map(Number) : []);
+      return;
     }
-  }, [isOpen]);
+
+    setAdults(2);
+    setChildren(0);
+    setRooms(1);
+    setChildAges([]);
+    setCheckIn(new Date());
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setCheckOut(tomorrow);
+
+    const timer = setTimeout(() => fetchPrices(true), 100);
+    return () => clearTimeout(timer);
+  }, [isOpen, accommodation, currentCurrency]);
 
   useEffect(() => {
     const tomorrow = new Date(checkIn);
@@ -100,6 +153,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       children,
       rooms,
       child_ages: childAges.length > 0 ? childAges.join(',') : undefined,
+      currency: currentCurrency,
     };
 
     if (new Date(checkOutStr) <= new Date(checkInStr)) {
@@ -108,19 +162,17 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       return;
     }
 
-    if (
-      !forceFetch &&
-      lastParamsRef.current &&
-      JSON.stringify(currentParams) === JSON.stringify(lastParamsRef.current) &&
-      lastSuccessfulDataRef.current
-    ) {
-      const cached = lastSuccessfulDataRef.current;
-      setDeals(cached.deals);
-      setOriginalDeals(cached.originalDeals);
-      setAlternativeDates(cached.alternativeDates);
-      setOriginalAltDates(cached.originalAltDates);
-      setError(cached.error);
-      return;
+    const cacheKey = getCacheKey(hotelId, currentParams);
+    if (!forceFetch) {
+      const cached = getCachedData(cacheKey);
+      if (cached) {
+        setDeals(cached.deals);
+        setOriginalDeals(cached.originalDeals);
+        setAlternativeDates(cached.alternativeDates);
+        setOriginalAltDates(cached.originalAltDates);
+        setError(cached.error);
+        return;
+      }
     }
 
     isFetchingRef.current = true;
@@ -197,8 +249,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         params: currentParams,
       };
 
-      lastSuccessfulDataRef.current = result;
-      lastParamsRef.current = currentParams;
+      setCachedData(cacheKey, result);
 
       setDeals(allDeals);
       setOriginalDeals(allOriginalDeals);
@@ -215,7 +266,10 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       isFetchingRef.current = false;
       abortControllerRef.current = null;
     }
-  }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, childAges, t, currentCurrency, convertAmount]);
+  }, [
+    isOpen, accommodation, checkIn, checkOut, adults, children, rooms, childAges,
+    currentCurrency, convertAmount, t, hotelId
+  ]);
 
   const handleUpdateSearch = () => {
     if (new Date(formatDateToLocal(checkOut)) <= new Date(formatDateToLocal(checkIn))) {
@@ -356,10 +410,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         <div className="p-4 sm:p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold truncate pr-2">{accommodation.name}</h3>
-            <button
-              onClick={() => { abortControllerRef.current?.abort(); onClose(); }}
-              className="text-gray-500 hover:text-gray-700"
-            >X</button>
+            <button onClick={() => { abortControllerRef.current?.abort(); onClose(); }} className="text-gray-500 hover:text-gray-700">X</button>
           </div>
 
           <div className="mb-6">
@@ -367,27 +418,11 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm mb-1">{t('checkIn')}</label>
-                <DatePicker
-                  onChange={setCheckIn}
-                  value={checkIn}
-                  minDate={new Date()}
-                  className="w-full"
-                  format="dd/MM/yyyy"
-                  disabled={loading || isFetchingRef.current}
-                  calendarClassName="mobile-calendar"
-                />
+                <DatePicker onChange={setCheckIn} value={checkIn} minDate={new Date()} className="w-full" format="dd/MM/yyyy" disabled={loading || isFetchingRef.current} calendarClassName="mobile-calendar" />
               </div>
               <div>
                 <label className="block text-sm mb-1">{t('checkOut')}</label>
-                <DatePicker
-                  onChange={setCheckOut}
-                  value={checkOut}
-                  minDate={new Date(checkIn.getTime() + 86400000)}
-                  className="w-full"
-                  format="dd/MM/yyyy"
-                  disabled={loading || isFetchingRef.current}
-                  calendarClassName="mobile-calendar"
-                />
+                <DatePicker onChange={setCheckOut} value={checkOut} minDate={new Date(checkIn.getTime() + 86400000)} className="w-full" format="dd/MM/yyyy" disabled={loading || isFetchingRef.current} calendarClassName="mobile-calendar" />
               </div>
             </div>
             <GuestControls />
