@@ -74,6 +74,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
 
   const isFetchingRef = useRef(false);
   const abortControllerRef = useRef(null);
+  const allowCacheSaveRef = useRef(true);
 
   const debouncedSetAdults = useMemo(() => debounce(setAdults, 300), []);
   const debouncedSetChildren = useMemo(() => debounce(setChildren, 300), []);
@@ -86,6 +87,17 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       debouncedSetRooms.cancel();
     };
   }, [debouncedSetAdults, debouncedSetChildren, debouncedSetRooms]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      allowCacheSaveRef.current = false;
+    } else {
+      allowCacheSaveRef.current = true;
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !accommodation) return;
@@ -249,7 +261,9 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         params: currentParams,
       };
 
-      setCachedData(cacheKey, result);
+      if (allowCacheSaveRef.current) {
+        setCachedData(cacheKey, result);
+      }
 
       setDeals(allDeals);
       setOriginalDeals(allOriginalDeals);
@@ -276,6 +290,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       setError(t('checkOutMustBeAfterCheckIn'));
       return;
     }
+    allowCacheSaveRef.current = true;
     fetchPrices(true);
   };
 
@@ -410,7 +425,15 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
         <div className="p-4 sm:p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold truncate pr-2">{accommodation.name}</h3>
-            <button onClick={() => { abortControllerRef.current?.abort(); onClose(); }} className="text-gray-500 hover:text-gray-700">X</button>
+            <button
+              onClick={() => {
+                abortControllerRef.current?.abort();
+                onClose();
+              }}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              X
+            </button>
           </div>
 
           <div className="mb-6">
@@ -418,11 +441,27 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm mb-1">{t('checkIn')}</label>
-                <DatePicker onChange={setCheckIn} value={checkIn} minDate={new Date()} className="w-full" format="dd/MM/yyyy" disabled={loading || isFetchingRef.current} calendarClassName="mobile-calendar" />
+                <DatePicker
+                  onChange={setCheckIn}
+                  value={checkIn}
+                  minDate={new Date()}
+                  className="w-full"
+                  format="dd/MM/yyyy"
+                  disabled={loading || isFetchingRef.current}
+                  calendarClassName="mobile-calendar"
+                />
               </div>
               <div>
                 <label className="block text-sm mb-1">{t('checkOut')}</label>
-                <DatePicker onChange={setCheckOut} value={checkOut} minDate={new Date(checkIn.getTime() + 86400000)} className="w-full" format="dd/MM/yyyy" disabled={loading || isFetchingRef.current} calendarClassName="mobile-calendar" />
+                <DatePicker
+                  onChange={setCheckOut}
+                  value={checkOut}
+                  minDate={new Date(checkIn.getTime() + 86400000)}
+                  className="w-full"
+                  format="dd/MM/yyyy"
+                  disabled={loading || isFetchingRef.current}
+                  calendarClassName="mobile-calendar"
+                />
               </div>
             </div>
             <GuestControls />
