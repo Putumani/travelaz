@@ -32,6 +32,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [rooms, setRooms] = useState(1);
+  const [childAges, setChildAges] = useState([]);
   const [alternativeDates, setAlternativeDates] = useState([]);
   const [originalAltDates, setOriginalAltDates] = useState([]);
 
@@ -62,17 +63,14 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       setAdults(2);
       setChildren(0);
       setRooms(1);
+      setChildAges([]);
       setCheckIn(new Date());
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       setCheckOut(tomorrow);
 
-      const timer = setTimeout(() => {
-        fetchPrices(true);
-      }, 100);
-
+      const timer = setTimeout(() => fetchPrices(true), 100);
       hasInitialFetchRef.current = true;
-
       return () => clearTimeout(timer);
     } else {
       if (abortControllerRef.current) abortControllerRef.current.abort();
@@ -95,7 +93,14 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
 
     const checkInStr = formatDateToLocal(checkIn);
     const checkOutStr = formatDateToLocal(checkOut);
-    const currentParams = { checkIn: checkInStr, checkOut: checkOutStr, adults, children, rooms };
+    const currentParams = {
+      checkIn: checkInStr,
+      checkOut: checkOutStr,
+      adults,
+      children,
+      rooms,
+      child_ages: childAges.length > 0 ? childAges.join(',') : undefined,
+    };
 
     if (new Date(checkOutStr) <= new Date(checkInStr)) {
       setError(t('checkOutMustBeAfterCheckIn'));
@@ -138,7 +143,10 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
               hotelUrl: source.url,
               checkIn: currentParams.checkIn,
               checkOut: currentParams.checkOut,
-              adults, children, rooms,
+              adults,
+              children,
+              rooms,
+              child_ages: currentParams.child_ages,
             }),
             signal: abortControllerRef.current.signal,
           }).then(r => r.json().then(data => ({ source: source.name, data })))
@@ -207,7 +215,7 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
       isFetchingRef.current = false;
       abortControllerRef.current = null;
     }
-  }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, t, currentCurrency, convertAmount]);
+  }, [isOpen, accommodation, checkIn, checkOut, adults, children, rooms, childAges, t, currentCurrency, convertAmount]);
 
   const handleUpdateSearch = () => {
     if (new Date(formatDateToLocal(checkOut)) <= new Date(formatDateToLocal(checkIn))) {
@@ -217,58 +225,113 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
     fetchPrices(true);
   };
 
-  const GuestControls = () => (
-    <div className="grid grid-cols-3 gap-4 mt-2">
-      <div>
-        <label className="block text-sm">{t('Adults')}</label>
-        <InputNumber
-          value={adults}
-          min={1}
-          max={30}
-          onChange={debouncedSetAdults}
-          className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label={t('Adults')}
-          upHandler={<span className="text-gray-500">+</span>}
-          downHandler={<span className="text-gray-500">-</span>}
-          formatter={v => `${v}`}
-          parser={v => (v ? parseInt(v.replace(/\D/g, '')) : 2)}
-          disabled={loading || isFetchingRef.current}
-        />
+  const GuestControls = () => {
+    const handleAdultsChange = (value) => {
+      if (value !== null && value !== adults) debouncedSetAdults(value);
+    };
+
+    const handleChildrenChange = (value) => {
+      if (value !== null && value !== children) {
+        debouncedSetChildren(value);
+        if (value < childAges.length) {
+          setChildAges(childAges.slice(0, value));
+        }
+      }
+    };
+
+    const handleRoomsChange = (value) => {
+      if (value !== null && value !== rooms) debouncedSetRooms(value);
+    };
+
+    const handleChildAgeChange = (index, age) => {
+      const newAges = [...childAges];
+      newAges[index] = age;
+      setChildAges(newAges);
+    };
+
+    return (
+      <div className="space-y-4 mt-2">
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm">{t('Adults')}</label>
+            <InputNumber
+              value={adults}
+              min={1}
+              max={30}
+              onChange={handleAdultsChange}
+              className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label={t('Adults')}
+              upHandler={<span className="text-gray-500">+</span>}
+              downHandler={<span className="text-gray-500">-</span>}
+              formatter={v => `${v}`}
+              parser={v => (v ? parseInt(v.replace(/\D/g, '')) : 2)}
+              disabled={loading || isFetchingRef.current}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm">{t('Children')}</label>
+            <InputNumber
+              value={children}
+              min={0}
+              max={10}
+              onChange={handleChildrenChange}
+              className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label={t('Children')}
+              upHandler={<span className="text-gray-500">+</span>}
+              downHandler={<span className="text-gray-500">-</span>}
+              formatter={v => `${v}`}
+              parser={v => (v ? parseInt(v.replace(/\D/g, '')) : 0)}
+              disabled={loading || isFetchingRef.current}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm">{t('Rooms')}</label>
+            <InputNumber
+              value={rooms}
+              min={1}
+              max={30}
+              onChange={handleRoomsChange}
+              className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label={t('Rooms')}
+              upHandler={<span className="text-gray-500">+</span>}
+              downHandler={<span className="text-gray-500">-</span>}
+              formatter={v => `${v}`}
+              parser={v => (v ? parseInt(v.replace(/\D/g, '')) : 1)}
+              disabled={loading || isFetchingRef.current}
+            />
+          </div>
+        </div>
+
+        {children > 0 && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">{t('Child Ages')} (0–17)</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {Array.from({ length: children }, (_, i) => (
+                <div key={i}>
+                  <label className="text-xs text-gray-600">Child {i + 1}</label>
+                  <InputNumber
+                    value={childAges[i] ?? 5}
+                    min={0}
+                    max={17}
+                    onChange={(age) => handleChildAgeChange(i, age)}
+                    className="w-full border rounded p-2 text-sm"
+                    upHandler={<span className="text-gray-500">+</span>}
+                    downHandler={<span className="text-gray-500">-</span>}
+                    formatter={v => `${v}`}
+                    parser={v => (v ? parseInt(v.replace(/\D/g, '')) : 5)}
+                    disabled={loading || isFetchingRef.current}
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">Required for accurate pricing</p>
+          </div>
+        )}
       </div>
-      <div>
-        <label className="block text-sm">{t('Children')}</label>
-        <InputNumber
-          value={children}
-          min={0}
-          max={9}
-          onChange={debouncedSetChildren}
-          className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label={t('Children')}
-          upHandler={<span className="text-gray-500">+</span>}
-          downHandler={<span className="text-gray-500">-</span>}
-          formatter={v => `${v}`}
-          parser={v => (v ? parseInt(v.replace(/\D/g, '')) : 0)}
-          disabled={loading || isFetchingRef.current}
-        />
-      </div>
-      <div>
-        <label className="block text-sm">{t('Rooms')}</label>
-        <InputNumber
-          value={rooms}
-          min={1}
-          max={30}
-          onChange={debouncedSetRooms}
-          className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label={t('Rooms')}
-          upHandler={<span className="text-gray-500">+</span>}
-          downHandler={<span className="text-gray-500">-</span>}
-          formatter={v => `${v}`}
-          parser={v => (v ? parseInt(v.replace(/\D/g, '')) : 1)}
-          disabled={loading || isFetchingRef.current}
-        />
-      </div>
-    </div>
-  );
+    );
+  };
 
   const AlternativeDatesList = () => (
     <div className="mt-4">
@@ -351,35 +414,38 @@ function ComparisonCard({ accommodation, isOpen, onClose }) {
             ) : deals.length > 0 ? (
               deals
                 .sort((a, b) => (a.price || Infinity) - (b.price || Infinity))
-                .map((deal, i) => (
-                  <div key={i} className="flex justify-between items-center py-3 border-b last:border-b-0">
-                    <div className="flex items-center flex-grow min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                        {deal.site_name[0]}
-                      </div>
-                      <div className="min-w-0 flex-grow">
-                        <div className="font-medium truncate">{deal.site_name}</div>
-                        <div className={`text-xs ${deal.availabilityStatus === 'Available' ? 'text-green-600' : 'text-red-600'}`}>
-                          {deal.available}
+                .map((deal, i) => {
+                  const ageParams = childAges.length > 0 ? childAges.map(age => `&age=${age}`).join('') : '';
+                  return (
+                    <div key={i} className="flex justify-between items-center py-3 border-b last:border-b-0">
+                      <div className="flex items-center flex-grow min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                          {deal.site_name[0]}
                         </div>
-                        {deal.roomType && <div className="text-xs text-gray-500 truncate">{deal.roomType}</div>}
+                        <div className="min-w-0 flex-grow">
+                          <div className="font-medium truncate">{deal.site_name}</div>
+                          <div className={`text-xs ${deal.availabilityStatus === 'Available' ? 'text-green-600' : 'text-red-600'}`}>
+                            {deal.available}
+                          </div>
+                          {deal.roomType && <div className="text-xs text-gray-500 truncate">{deal.roomType}</div>}
+                        </div>
+                      </div>
+                      <div className="flex items-center flex-shrink-0 ml-2">
+                        <span className="font-bold mr-4">
+                          {getCurrencySymbol()}{deal.price ? deal.price.toFixed(2) : 'N/A'}
+                        </span>
+                        <a
+                          href={`${deal.affiliate_url}&checkin=${formatDateToLocal(checkIn)}&checkout=${formatDateToLocal(checkOut)}&group_adults=${adults}&group_children=${children}${ageParams}&no_rooms=${rooms}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 bg-black text-white text-sm rounded hover:bg-gray-800"
+                        >
+                          {t('viewDeal')}
+                        </a>
                       </div>
                     </div>
-                    <div className="flex items-center flex-shrink-0 ml-2">
-                      <span className="font-bold mr-4">
-                        {getCurrencySymbol()}{deal.price ? deal.price.toFixed(2) : 'N/A'}
-                      </span>
-                      <a
-                        href={`${deal.affiliate_url}&checkin=${formatDateToLocal(checkIn)}&checkout=${formatDateToLocal(checkOut)}&group_adults=${adults}&group_children=${children}&no_rooms=${rooms}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1 bg-black text-white text-sm rounded hover:bg-gray-800"
-                      >
-                        {t('viewDeal')}
-                      </a>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
             ) : (
               <div className="py-6 text-center text-gray-500">{t('noDealsAvailable')}</div>
             )}
