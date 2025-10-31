@@ -1,3 +1,21 @@
+const API_BASE = import.meta.env.DEV
+  ? 'http://localhost:5000'
+  : 'https://travelaz.onrender.com';
+
+export const scrapeBooking = (data) =>
+  fetch(`${API_BASE}/scrape-booking`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+
+export const scrapeTrip = (data) =>
+  fetch(`${API_BASE}/scrape-trip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+
 export async function translateText(text, targetLang) {
   const response = await fetch('/api/translate', {
     method: 'POST',
