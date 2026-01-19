@@ -1,4 +1,3 @@
-// Home.jsx
 import Hero from '@/components/Hero';
 import Layout from '@/components/Layout';
 import { useEffect, useState } from 'react';
@@ -119,10 +118,10 @@ function Home() {
               Explore Popular Hotels
             </a>
             <a
-              href="/all-cities"
+              href="/all-destinations"  
               className="px-8 py-3 bg-transparent border-2 border-white text-white font-semibold rounded-lg hover:bg-white/10 transition-all duration-300"
             >
-              Browse All Destinations
+              Browse All Accommodations 
             </a>
           </div>
         </div>
