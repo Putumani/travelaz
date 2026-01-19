@@ -4,7 +4,7 @@ import 'react-lazy-load-image-component/src/effects/blur.css';
 import ComparisonCard from './ComparisonCard';
 import { CurrencyContext } from '../context/CurrencyContext';
 import { useTranslation } from '../i18n/useTranslation';
-import ErrorBoundary from './ErrorBoundary'; // Import the ErrorBoundary
+import ErrorBoundary from './ErrorBoundary'; 
 
 function AccommodationCard({ accommodation }) {
   const [isPopupOpen, setIsPopupOpen] = useState(false);

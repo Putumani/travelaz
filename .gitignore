@@ -15,6 +15,9 @@ page_content.html
 trip_page_content.html
 trip_error_page_content.html
 
+.github
+.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
