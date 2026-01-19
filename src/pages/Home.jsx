@@ -1,16 +1,16 @@
+// Home.jsx
 import Hero from '@/components/Hero';
-import { Link, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import AccommodationCard from '@/components/AccommodationCard';
 import ErrorBoundary from '@/components/ErrorBoundary'; 
+import FeaturedDestinationCard from '@/components/FeaturedDestinationCard';
 import { useTranslation } from '../i18n/useTranslation';
 
 function Home() {
   const [popularHotels, setPopularHotels] = useState([]);
   const [errorMessage, setErrorMessage] = useState(null);
-  const location = useLocation();
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -36,7 +36,7 @@ function Home() {
     };
 
     fetchPopularHotels();
-  }, [location, t]);
+  }, [t]);
 
   const hotelCardFallback = ({ error, retry }) => (
     <div className="bg-white rounded-lg shadow-md overflow-hidden border border-red-200">
@@ -82,42 +82,49 @@ function Home() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12 bg-white">
         <h2 className="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8 text-black">{t('FeaturedDestinations')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-          <Link to="/durban" className="block">
-            <div
-              className="bg-cover bg-center h-52 sm:h-56 lg:h-64 rounded-lg shadow-md"
-              style={{
-                backgroundImage: `url(https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_400,c_fill/v1759506368/Durban-Beach-View_pgvgag)`
-               }}
+          <FeaturedDestinationCard 
+            city="durban"
+            title={t('Durban')}
+            description={t('durbanDescription') || 'Beautiful beaches & warm waters'}
+            path="/durban"
+          />
+          <FeaturedDestinationCard 
+            city="capetown"
+            title={t('CapeTown')}
+            description={t('capetownDescription') || 'Majestic mountains & vineyards'}
+            path="/capetown"
+          />
+          <FeaturedDestinationCard 
+            city="bangkok"
+            title={t('Bangkok')}
+            description={t('bangkokDescription') || 'Vibrant street life & temples'}
+            path="/bangkok"
+          />
+        </div>
+      </section>
+      
+      <section className="bg-gradient-to-r from-blue-600 to-purple-700 py-16 sm:py-20">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6">
+            Ready to Find Your Perfect Stay?
+          </h2>
+          <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
+            Compare prices, read reviews, and book with confidence across thousands of accommodations worldwide.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="#popular-hotels"
+              className="px-8 py-3 bg-white text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-all duration-300 transform hover:-translate-y-1"
             >
-              <div className="bg-black bg-opacity-50 h-full flex items-center justify-center rounded-lg">
-                <h3 className="text-xl sm:text-2xl font-semibold text-white">{t('Durban')}</h3>
-              </div>
-            </div>
-          </Link>
-          <Link to="/capetown" className="block">
-            <div
-              className="bg-cover bg-center h-52 sm:h-56 lg:h-64 rounded-lg shadow-md"
-              style={{
-                backgroundImage: `url(https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_400,c_fill/pexels-jvdm-3736245_d6d1jc)`
-              }}
+              Explore Popular Hotels
+            </a>
+            <a
+              href="/all-cities"
+              className="px-8 py-3 bg-transparent border-2 border-white text-white font-semibold rounded-lg hover:bg-white/10 transition-all duration-300"
             >
-              <div className="bg-black bg-opacity-50 h-full flex items-center justify-center rounded-lg">
-                <h3 className="text-xl sm:text-2xl font-semibold text-white">{t('CapeTown')}</h3>
-              </div>
-            </div>
-          </Link>
-          <Link to="/bangkok" className="block">
-            <div
-              className="bg-cover bg-center h-52 sm:h-56 lg:h-64 rounded-lg shadow-md"
-              style={{
-                backgroundImage: `url(https://res.cloudinary.com/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_400,c_fill/pexels-jimmy-teoh-294331-2402000_y1e72y)`
-              }}
-            >
-              <div className="bg-black bg-opacity-50 h-full flex items-center justify-center rounded-lg">
-                <h3 className="text-xl sm:text-2xl font-semibold text-white">{t('Bangkok')}</h3>
-              </div>
-            </div>
-          </Link>
+              Browse All Destinations
+            </a>
+          </div>
         </div>
       </section>
     </Layout>
