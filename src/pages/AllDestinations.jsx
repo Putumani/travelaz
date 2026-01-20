@@ -251,10 +251,10 @@ function AllDestinations() {
       <div className="bg-gradient-to-r from-blue-600 to-purple-700 py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-            {t('AllAccommodations') || 'All Accommodations'}
+            {t('All Accommodations') || 'All Accommodations'}
           </h1>
           <p className="text-blue-100 text-lg max-w-3xl">
-            {t('AllAccommodationsDescription') || 'Discover and compare thousands of hotels, apartments, and accommodations worldwide'}
+            {t('All Accommodations Description') || 'Discover and compare thousands of hotels, apartments, and accommodations worldwide'}
           </p>
         </div>
       </div>
@@ -271,7 +271,7 @@ function AllDestinations() {
                 </div>
                 <input
                   type="text"
-                  placeholder={t('SearchPlaceholder') || "Search by hotel name, city, or area..."}
+                  placeholder={t('Search by hotel name, city, or area...') || "Search by hotel name, city, or area..."}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -286,7 +286,7 @@ function AllDestinations() {
                 onChange={(e) => setSelectedCity(e.target.value)}
                 aria-label="Select city"
               >
-                <option value="all">{t('AllCities') || 'All Cities'}</option>
+                <option value="all">{t('All Cities') || 'All Cities'}</option>
                 {cities
                   .filter(city => city !== 'all')
                   .map(city => (
@@ -303,7 +303,7 @@ function AllDestinations() {
                 onChange={(e) => setSortBy(e.target.value)}
                 aria-label="Sort by"
               >
-                <option value="view_count">{t('MostPopular') || 'Most Popular'}</option>
+                <option value="view_count">{t('Most Popular') || 'Most Popular'}</option>
                 <option value="rating">{t('HighestRating') || 'Highest Rating'}</option>
                 <option value="price_low">{t('PriceLowToHigh') || 'Price: Low to High'}</option>
                 <option value="price_high">{t('PriceHighToLow') || 'Price: High to Low'}</option>
@@ -314,10 +314,8 @@ function AllDestinations() {
 
           <div className="mt-4 flex justify-between items-center">
             <p className="text-gray-600">
-              {t('ShowingXofY', { 
-                filtered: filteredHotels.length, 
-                total: allHotels.length 
-              }) || `Showing ${filteredHotels.length} of ${allHotels.length} accommodations`}
+              Showing <span className="font-semibold">{filteredHotels.length}</span> of{' '}
+              <span className="font-semibold">{allHotels.length}</span> accommodations
             </p>
             {(searchQuery || selectedCity !== 'all') && (
               <button
