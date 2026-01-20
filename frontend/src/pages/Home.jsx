@@ -108,7 +108,7 @@ function Home() {
             Ready to Find Your Perfect Stay?
           </h2>
           <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
-            Compare prices, read reviews, and book with confidence across thousands of accommodations worldwide.
+            Compare prices, read reviews, and book with confidence across best accommodations in Cape Town, Bangkok and Durban.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
