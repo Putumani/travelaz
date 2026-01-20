@@ -15,8 +15,8 @@ page_content.html
 trip_page_content.html
 trip_error_page_content.html
 
-.github
-.env
+/.github
+/.env
 
 # Editor directories and files
 .vscode/*
