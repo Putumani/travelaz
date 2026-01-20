@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import ComparisonCard from './ComparisonCard';
@@ -12,28 +12,50 @@ function AccommodationCard({ accommodation }) {
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const { convertAmount, getCurrencySymbol } = useContext(CurrencyContext);
   const { t } = useTranslation();
+  const lastPriceRef = useRef(null);
 
   useEffect(() => {
+    let isMounted = true;
+    const currentPrice = accommodation?.price;
+
+    if (lastPriceRef.current === currentPrice) {
+      return;
+    }
+
     const updatePrice = async () => {
-      if (accommodation?.price != null && typeof accommodation.price === 'number') {
+      if (currentPrice != null && typeof currentPrice === 'number') {
         setIsLoadingPrice(true);
         try {
-          const price = await convertAmount(accommodation.price, 'USD');
-          if (price !== convertedPrice) {
+          const price = await convertAmount(currentPrice, 'USD');
+          if (isMounted) {
             setConvertedPrice(price);
+            lastPriceRef.current = currentPrice; 
           }
         } catch (error) {
           console.error('Error converting price:', error);
-          setConvertedPrice(accommodation.price.toFixed(2));
+          if (isMounted) {
+            setConvertedPrice(currentPrice.toFixed(2));
+            lastPriceRef.current = currentPrice;
+          }
         } finally {
-          setIsLoadingPrice(false);
+          if (isMounted) {
+            setIsLoadingPrice(false);
+          }
         }
       } else {
-        setConvertedPrice(null);
+        if (isMounted) {
+          setConvertedPrice(null);
+          lastPriceRef.current = currentPrice;
+        }
       }
     };
+
     updatePrice();
-  }, [accommodation, convertAmount, convertedPrice]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accommodation?.price, convertAmount]); 
 
   const handleCardClick = () => {
     setIsPopupOpen(true);
