@@ -14,7 +14,6 @@ function AllDestinations() {
   const [sortBy, setSortBy] = useState('view_count');
   const { t } = useTranslation();
 
-  // Memoize cities extraction
   const cities = useMemo(() => {
     if (!allHotels.length) return ['all'];
     const citySet = new Set();
@@ -24,7 +23,6 @@ function AllDestinations() {
     return ['all', ...Array.from(citySet)];
   }, [allHotels]);
 
-  // Single useEffect for data fetching
   useEffect(() => {
     let isMounted = true;
     
@@ -73,18 +71,15 @@ function AllDestinations() {
     };
   }, [t]);
 
-  // Optimized filter function with debouncing effect
   const filteredHotels = useMemo(() => {
     if (!allHotels.length) return [];
 
     let result = [...allHotels];
 
-    // Filter by city
     if (selectedCity !== 'all') {
       result = result.filter(hotel => hotel.city === selectedCity);
     }
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter(hotel =>
@@ -94,7 +89,6 @@ function AllDestinations() {
       );
     }
 
-    // Sort results
     return result.sort((a, b) => {
       const aPrice = a.price || 0;
       const bPrice = b.price || 0;
