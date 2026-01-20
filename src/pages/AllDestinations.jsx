@@ -1,7 +1,7 @@
 import Layout from '@/components/Layout';
 import AccommodationCard from '@/components/AccommodationCard';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useTranslation } from '../i18n/useTranslation';
 
@@ -12,7 +12,27 @@ function AllDestinations() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('all');
   const [sortBy, setSortBy] = useState('view_count');
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }, []);
 
   const cities = useMemo(() => {
     if (!allHotels.length) return ['all'];
@@ -153,7 +173,6 @@ function AllDestinations() {
     </div>
   ), [t]);
 
-  // Single rendering logic without duplication
   const renderContent = () => {
     if (loading) {
       return (
@@ -225,7 +244,6 @@ function AllDestinations() {
       );
     }
 
-    // Render hotels grid
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredHotels.map((hotel) => (
@@ -304,10 +322,10 @@ function AllDestinations() {
                 aria-label="Sort by"
               >
                 <option value="view_count">{t('Most Popular') || 'Most Popular'}</option>
-                <option value="rating">{t('HighestRating') || 'Highest Rating'}</option>
-                <option value="price_low">{t('PriceLowToHigh') || 'Price: Low to High'}</option>
-                <option value="price_high">{t('PriceHighToLow') || 'Price: High to Low'}</option>
-                <option value="name">{t('NameAtoZ') || 'Name: A to Z'}</option>
+                <option value="rating">{t('Highest Rating') || 'Highest Rating'}</option>
+                <option value="price_low">{t('Price Low To High') || 'Price: Low to High'}</option>
+                <option value="price_high">{t('Price High To Low') || 'Price: High to Low'}</option>
+                <option value="name">{t('Name A to Z') || 'Name: A to Z'}</option>
               </select>
             </div>
           </div>
@@ -370,6 +388,30 @@ function AllDestinations() {
           </div>
         )}
       </div>
+
+      <button
+        onClick={scrollToTop}
+        className={`fixed bottom-8 right-8 z-50 p-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-110 ${
+          showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'
+        }`}
+        aria-label="Scroll to top"
+        title="Back to top"
+      >
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          className="h-6 w-6" 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M5 10l7-7m0 0l7 7m-7-7v18" 
+          />
+        </svg>
+      </button>
     </Layout>
   );
 }
