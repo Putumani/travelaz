@@ -135,7 +135,6 @@ function AllDestinations() {
     });
   }, [allHotels, selectedCity, searchQuery, sortBy]);
 
-  // Memoize skeletons and fallbacks
   const HotelSkeleton = useCallback(() => (
     <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 animate-pulse">
       <div className="h-48 bg-gray-200"></div>
@@ -269,10 +268,10 @@ function AllDestinations() {
       <div className="bg-gradient-to-r from-blue-600 to-purple-700 py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-            {t('All Accommodations') || 'All Accommodations'}
+            {t('AllAccommodations')}
           </h1>
           <p className="text-blue-100 text-lg max-w-3xl">
-            {t('All Accommodations Description') || 'Discover and compare thousands of hotels, apartments, and accommodations worldwide'}
+            {t('AllAccommodationsDescription')}
           </p>
         </div>
       </div>
@@ -289,7 +288,7 @@ function AllDestinations() {
                 </div>
                 <input
                   type="text"
-                  placeholder={t('Search by hotel name, city, or area...') || "Search by hotel name, city, or area..."}
+                  placeholder={t('SearchPlaceholder')}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -304,7 +303,7 @@ function AllDestinations() {
                 onChange={(e) => setSelectedCity(e.target.value)}
                 aria-label="Select city"
               >
-                <option value="all">{t('All Cities') || 'All Cities'}</option>
+                <option value="all">{t('AllCities')}</option>
                 {cities
                   .filter(city => city !== 'all')
                   .map(city => (
@@ -321,11 +320,11 @@ function AllDestinations() {
                 onChange={(e) => setSortBy(e.target.value)}
                 aria-label="Sort by"
               >
-                <option value="view_count">{t('Most Popular') || 'Most Popular'}</option>
-                <option value="rating">{t('Highest Rating') || 'Highest Rating'}</option>
-                <option value="price_low">{t('Price Low To High') || 'Price: Low to High'}</option>
-                <option value="price_high">{t('Price High To Low') || 'Price: High to Low'}</option>
-                <option value="name">{t('Name A to Z') || 'Name: A to Z'}</option>
+                <option value="view_count">{t('MostPopular')}</option>
+                <option value="rating">{t('HighestRating')}</option>
+                <option value="price_low">{t('PriceLowToHigh')}</option>
+                <option value="price_high">{t('PriceHighToLow')}</option>
+                <option value="name">{t('NameAtoZ')}</option>
               </select>
             </div>
           </div>
@@ -340,7 +339,7 @@ function AllDestinations() {
                 onClick={clearFilters}
                 className="text-sm text-blue-600 hover:text-blue-800 font-medium"
               >
-                {t('ClearFilters') || 'Clear filters'}
+                {t('ClearFilters')}
               </button>
             )}
           </div>
@@ -355,13 +354,13 @@ function AllDestinations() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
                 <div className="text-3xl font-bold text-blue-600 mb-2">{allHotels.length}</div>
-                <div className="text-gray-600 font-medium">{t('TotalAccommodations') || 'Total Accommodations'}</div>
+                <div className="text-gray-600 font-medium">{t('TotalAccommodations')}</div>
               </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
                 <div className="text-3xl font-bold text-green-600 mb-2">
                   {cities.length - 1}
                 </div>
-                <div className="text-gray-600 font-medium">{t('Cities') || 'Cities'}</div>
+                <div className="text-gray-600 font-medium">{t('Cities')}</div>
               </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
                 <div className="text-3xl font-bold text-purple-600 mb-2">
@@ -372,7 +371,7 @@ function AllDestinations() {
                     return average.toFixed(1);
                   })()}
                 </div>
-                <div className="text-gray-600 font-medium">{t('AverageRating') || 'Average Rating'}</div>
+                <div className="text-gray-600 font-medium">{t('AverageRating')}</div>
               </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
                 <div className="text-3xl font-bold text-orange-600 mb-2">
@@ -382,7 +381,7 @@ function AllDestinations() {
                     return Math.round(average).toLocaleString();
                   })()}
                 </div>
-                <div className="text-gray-600 font-medium">{t('AveragePrice') || 'Average Price'}</div>
+                <div className="text-gray-600 font-medium">{t('AveragePrice')}</div>
               </div>
             </div>
           </div>

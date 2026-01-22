@@ -84,19 +84,19 @@ function Home() {
           <FeaturedDestinationCard 
             city="durban"
             title={t('Durban')}
-            description={t('durbanDescription') || 'Beautiful beaches & warm waters'}
+            description={t('durbanDescription')}
             path="/durban"
           />
           <FeaturedDestinationCard 
             city="capetown"
             title={t('CapeTown')}
-            description={t('capetownDescription') || 'Majestic mountains & vineyards'}
+            description={t('capetownDescription')}
             path="/capetown"
           />
           <FeaturedDestinationCard 
             city="bangkok"
             title={t('Bangkok')}
-            description={t('bangkokDescription') || 'Vibrant street life & temples'}
+            description={t('bangkokDescription')}
             path="/bangkok"
           />
         </div>
@@ -105,23 +105,23 @@ function Home() {
       <section className="bg-gradient-to-r from-blue-600 to-purple-700 py-16 sm:py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6">
-            Ready to Find Your Perfect Stay?
+            {t('FindPerfectStay')}
           </h2>
           <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
-            Compare prices, read reviews, and book with confidence across best accommodations in Cape Town, Bangkok and Durban.
+            {t('FindPerfectStayDescription')}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
               href="#popular-hotels"
               className="px-8 py-3 bg-white text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-all duration-300 transform hover:-translate-y-1"
             >
-              Explore Popular Hotels
+              {t('ExplorePopularHotels')}
             </a>
             <a
               href="/all-destinations"  
               className="px-8 py-3 bg-transparent border-2 border-white text-white font-semibold rounded-lg hover:bg-white/10 transition-all duration-300"
             >
-              Browse All Accommodations 
+              {t('BrowseAllAccommodations')}
             </a>
           </div>
         </div>
